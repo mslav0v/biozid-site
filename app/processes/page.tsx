@@ -1,12 +1,10 @@
 "use client";
 
 import Image from 'next/image';
-import Link from 'next/link';
-import { useState } from 'react';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
 
 export default function ProcessesPage() {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
   const steps = [
     {
       id: 1,
@@ -84,47 +82,10 @@ export default function ProcessesPage() {
   return (
     <div className="min-h-screen bg-white relative">
       
-      {/* 1. HEADER / NAVIGATION (С дизайна от калкулатора и голямо лого) */}
-      <nav className="fixed top-0 w-full z-[100] bg-white/95 backdrop-blur-md border-b border-gray-100 transition-all duration-300">
-        <div className="flex items-center justify-between px-6 md:px-10 h-20 md:h-24 max-w-[1800px] mx-auto">
-          <Link href="/" className="relative z-10 cursor-pointer flex items-center">
-            {/* Увеличено лого горе вляво */}
-            <Image src="/logo.png" alt="БИОЗИД" width={160} height={48} priority className="md:w-[180px] h-auto" />
-          </Link>
-          
-          <ul className="hidden lg:flex space-x-10 text-[11px] font-bold tracking-[0.2em] text-slate-800 uppercase items-center">
-            <li><Link href="/houses" className="hover:text-teal-700 transition">Къщи</Link></li>
-            <li><Link href="/processes" className="text-teal-700 transition">Процеси</Link></li>
-            <li><Link href="/advantages" className="hover:text-teal-700 transition">Предимства</Link></li>
-            <li><Link href="/technology" className="hover:text-teal-700 transition">Технология</Link></li>
-            <li><Link href="/calculator" className="hover:text-teal-700 transition">Калкулатор</Link></li>
-          </ul>
+      {/* 1. HEADER / NAVIGATION */}
+      <Navbar />
 
-          <div className="flex items-center gap-6">
-            <Link href="/contacts" className="hidden sm:block border border-slate-900 text-slate-900 px-6 py-3 text-[10px] font-bold tracking-widest uppercase hover:bg-slate-900 hover:text-white transition">
-              Контакти
-            </Link>
-            <button 
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="lg:hidden text-slate-900 p-2 text-2xl"
-            >
-              {isMobileMenuOpen ? '✕' : '☰'}
-            </button>
-          </div>
-        </div>
-
-        {isMobileMenuOpen && (
-          <div className="lg:hidden absolute top-full left-0 w-full bg-white border-b border-gray-100 p-8 flex flex-col space-y-6 text-center font-bold tracking-widest text-xs uppercase shadow-2xl">
-            <Link href="/houses" className="py-2 hover:text-teal-700 transition" onClick={() => setIsMobileMenuOpen(false)}>Къщи</Link>
-            <Link href="/processes" className="py-2 text-teal-700 transition" onClick={() => setIsMobileMenuOpen(false)}>Процеси</Link>
-            <Link href="/advantages" className="py-2 hover:text-teal-700 transition" onClick={() => setIsMobileMenuOpen(false)}>Предимства</Link>
-            <Link href="/calculator" className="py-2 hover:text-teal-700 transition" onClick={() => setIsMobileMenuOpen(false)}>Калкулатор</Link>
-            <Link href="/contacts" className="bg-slate-900 text-white py-4 px-6 uppercase tracking-widest text-[10px]" onClick={() => setIsMobileMenuOpen(false)}>Контакти</Link>
-          </div>
-        )}
-      </nav>
-
-      {/* 2. ОСНОВНО СЪДЪРЖАНИЕ (С изчистен дизайн) */}
+      {/* 2. ОСНОВНО СЪДЪРЖАНИЕ */}
       <div className="pt-32 md:pt-44 pb-16 md:pb-28">
         <div className="container mx-auto px-4 max-w-6xl">
           
@@ -185,33 +146,9 @@ export default function ProcessesPage() {
         </div>
       </div>
 
-      {/* 3. FOOTER (Намалено пространство, голямо лого и социални иконки) */}
-      <footer className="bg-white py-10 md:py-14 px-6 border-t border-slate-100">
-        <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row justify-between items-center gap-10">
-          
-          {/* Лого във футера - увеличено */}
-          <div className="flex flex-col items-center md:items-start gap-4">
-            <Image src="/logo.png" alt="БИОЗИД" width={150} height={45} className="grayscale opacity-80 hover:opacity-100 transition" />
-            <p className="text-[9px] font-bold tracking-[0.3em] uppercase text-slate-400">
-              &copy; {new Date().getFullYear()} БИОЗИД. Строителство от бъдещето.
-            </p>
-          </div>
-
-          {/* Социални мрежи (текстови линкове със стил на иконки) */}
-          <div className="flex items-center gap-8">
-            <Link href="https://facebook.com" className="text-slate-400 hover:text-teal-700 transition text-[11px] font-bold tracking-widest uppercase">FB</Link>
-            <Link href="https://instagram.com" className="text-slate-400 hover:text-teal-700 transition text-[11px] font-bold tracking-widest uppercase">IG</Link>
-            <Link href="https://tiktok.com" className="text-slate-400 hover:text-teal-700 transition text-[11px] font-bold tracking-widest uppercase">TT</Link>
-            <Link href="https://youtube.com" className="text-slate-400 hover:text-teal-700 transition text-[11px] font-bold tracking-widest uppercase">YT</Link>
-          </div>
-
-          {/* Допълнителни линкове */}
-          <div className="flex gap-8 text-[9px] font-bold tracking-widest uppercase text-slate-500">
-            <Link href="/privacy" className="hover:text-teal-700 transition">Политика</Link>
-            <Link href="/terms" className="hover:text-teal-700 transition">Условия</Link>
-          </div>
-        </div>
-      </footer>
+      {/* 3. FOOTER */}
+      <Footer />
+      
     </div>
   );
 }
