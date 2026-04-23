@@ -1,0 +1,38 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_PRISMA_URL")
+}
+
+// Модел за Каталога с Къщи
+model House {
+  id           String   @id @default(cuid())
+  name         String
+  area         Float    // Квадратура
+  bedrooms     Int      // Брой спални
+  bathrooms    Int      // Брой бани
+  floors       Int      // Етажи
+  price        String   // Цена (напр. "от 120,000 €")
+  description  String?  @db.Text
+  imageUrl     String?  // Път към снимката
+  tags         String[] // Тагове (напр. ["Енергоефективна", "Премиум"])
+  createdAt    DateTime @default(now())
+}
+
+// Модел за Клиентските заявки от Калкулатора
+model QuoteRequest {
+  id            String   @id @default(cuid())
+  clientName    String
+  clientPhone   String
+  totalArea     Float
+  status        String   @default("new") // new, in_progress, completed
+  underlayUrl   String?  // Линк към качената подложка (чертеж)
+  cadData       Json?    // Тук ще пазим целия масив със стени и панели за CAD редактора
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
