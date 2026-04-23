@@ -75,7 +75,9 @@ export default async function HouseDetailsPage({
             </div>
 
             <p className="text-2xl font-bold text-teal-600 mb-8">
-              {typeof house.price === 'number' ? `${house.price.toLocaleString()} €` : house.price}
+              {typeof house.price === 'number' 
+  ? `${(house.price as number).toLocaleString()} €` 
+  : house.price}
             </p>
 
             <div className="grid grid-cols-3 gap-4 mb-10">
