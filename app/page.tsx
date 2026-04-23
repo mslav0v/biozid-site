@@ -1,11 +1,13 @@
 "use client";
 
 import Image from 'next/image';
+import Link from 'next/link';
 import { useState } from 'react';
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
 
 export default function Home() {
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Състояние за плавното разширяване на видеото
   const [isVideoExpanded, setIsVideoExpanded] = useState(false);
@@ -13,49 +15,11 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-white text-slate-900 font-sans relative overflow-x-hidden">
       
-      {/* 1. HEADER (Оптимизиран: по-тънък и с по-голям текст) */}
-      <nav className="fixed w-full z-[100] bg-white/95 backdrop-blur-md border-b border-gray-100 transition-all duration-300">
-        <div className="flex items-center justify-between px-6 md:px-10 h-16 md:h-20 max-w-[1800px] mx-auto">
-          <div className="relative z-10 cursor-pointer flex items-center">
-            <Image src="/logo.png" alt="БИОЗИД" width={110} height={32} priority className="md:w-[130px] h-auto" />
-          </div>
-          
-          {/* Десктоп Меню - Увеличен шрифт на text-xs */}
-          <ul className="hidden lg:flex space-x-8 text-xs font-bold tracking-widest text-slate-800 uppercase items-center">
-            <li className="hover:text-teal-700 cursor-pointer transition">Къщи</li>
-            <li className="hover:text-teal-700 cursor-pointer transition">Процес</li>
-            <li className="hover:text-teal-700 cursor-pointer transition">Предимства</li>
-            <li className="hover:text-teal-700 cursor-pointer transition">Технология</li>
-            <li className="hover:text-teal-700 cursor-pointer transition text-teal-700">Калкулатор</li>
-          </ul>
-
-          <div className="flex items-center gap-4">
-            <button className="hidden sm:block border border-slate-900 text-slate-900 px-5 py-2 text-xs font-bold tracking-widest uppercase hover:bg-slate-900 hover:text-white transition">Контакти</button>
-            
-            {/* Бутон за мобилно меню */}
-            <button 
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="lg:hidden text-slate-900 p-2"
-            >
-              {isMobileMenuOpen ? '✕' : '☰'}
-            </button>
-          </div>
-        </div>
-
-        {/* Мобилно Меню Overlay */}
-        {isMobileMenuOpen && (
-          <div className="lg:hidden absolute top-full left-0 w-full bg-white border-b border-gray-100 p-8 flex flex-col space-y-6 text-center font-bold tracking-widest text-sm uppercase shadow-xl animate-in slide-in-from-top">
-            <a href="#" className="py-2 hover:text-teal-700 transition">Къщи</a>
-            <a href="#" className="py-2 hover:text-teal-700 transition">Процес</a>
-            <a href="#" className="py-2 hover:text-teal-700 transition">Предимства</a>
-            <a href="#" className="py-2 text-teal-700">Калкулатор</a>
-            <button className="bg-slate-900 text-white py-4 px-6 rounded-sm mt-2">Контакти</button>
-          </div>
-        )}
-      </nav>
+      {/* 1. HEADER (Изнесеният компонент с активното меню) */}
+      <Navbar />
 
       {/* 2. HERO СЕКЦИЯ (Оптимизирана: намален горен отстъп) */}
-      <section className="pt-28 md:pt-32 pb-12 md:pb-20 px-6 max-w-[1600px] mx-auto flex flex-col lg:flex-row items-center gap-12 md:gap-20">
+      <section className="pt-32 md:pt-40 pb-12 md:pb-20 px-6 max-w-[1600px] mx-auto flex flex-col lg:flex-row items-center gap-12 md:gap-20">
         <div className="w-full lg:w-1/2 text-center lg:text-left">
           <h1 className="text-4xl md:text-7xl font-extralight tracking-tighter text-slate-900 mb-6 leading-tight">
               Високоефективни <br /> <span className="italic text-teal-700">здравословни</span> домове
@@ -64,8 +28,12 @@ export default function Home() {
               Използваме авангардни материали и собствена производствена технология за създаване на енергийно ефективни и устойчиви къщи.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-            <button className="bg-slate-900 text-white px-8 py-4 text-xs font-bold tracking-[0.2em] uppercase hover:bg-teal-700 transition">Разгледайте моделите</button>
-            <button className="border border-slate-300 text-slate-900 px-8 py-4 text-xs font-bold tracking-[0.2em] uppercase hover:bg-slate-50 transition">Нашата мисия</button>
+            <Link href="/houses" className="bg-slate-900 text-white px-8 py-4 text-xs font-bold tracking-[0.2em] uppercase hover:bg-teal-700 transition text-center inline-block">
+              Разгледайте моделите
+            </Link>
+            <Link href="/advantages" className="border border-slate-300 text-slate-900 px-8 py-4 text-xs font-bold tracking-[0.2em] uppercase hover:bg-slate-50 transition text-center inline-block">
+              Нашата мисия
+            </Link>
           </div>
         </div>
 
@@ -155,7 +123,9 @@ export default function Home() {
             <p className="text-base md:text-lg text-slate-600 font-light leading-relaxed mb-12">
               Използваме висококачествена стомана, разкроена с компютърна точност. Всеки детайл е номериран и подготвен за светкавичен монтаж, гарантирайки устойчивост на земетресения и перфектна геометрия.
             </p>
-            <button className="text-[10px] font-bold tracking-widest uppercase text-slate-900 border-b-2 border-teal-700 pb-2 hover:opacity-70 transition">Вижте процеса</button>
+            <Link href="/processes" className="inline-block text-[10px] font-bold tracking-widest uppercase text-slate-900 border-b-2 border-teal-700 pb-2 hover:opacity-70 transition">
+              Вижте процеса
+            </Link>
           </div>
           <div className="order-1 lg:order-2 relative aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl">
             <Image src="/tech-frames.jpg" alt="БИОЗИД Метална Конструкция" fill className="object-cover" />
@@ -175,7 +145,9 @@ export default function Home() {
              <p className="text-base md:text-xl font-light text-slate-300 leading-relaxed mb-12">
                 Окачена фасада позволяваща на къщата да диша и в същото време има елегантен дизайн с ефект на дърво и черен мат. Нашата окачена фасада е устойчива на най-тежките метеорологични условия, не изисква поддръжка и запазва цветовете си десетилетия наред.
              </p>
-             <button className="bg-teal-700 hover:bg-teal-600 px-10 py-5 text-xs font-bold tracking-widest uppercase transition rounded-sm shadow-lg">Изберете вашия дизайн</button>
+             <Link href="/houses" className="inline-block bg-teal-700 hover:bg-teal-600 px-10 py-5 text-xs font-bold tracking-widest uppercase transition rounded-sm shadow-lg">
+               Изберете вашия дизайн
+             </Link>
           </div>
         </div>
       </section>
@@ -190,13 +162,9 @@ export default function Home() {
         </div>
       )}
 
-      {/* FOOTER */}
-      <footer className="bg-white py-12 md:py-20 px-6 border-t border-slate-100">
-        <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row justify-between items-center gap-6 opacity-60">
-          <Image src="/logo.png" alt="БИОЗИД" width={100} height={35} className="grayscale" />
-          <p className="text-[10px] font-bold tracking-[0.3em] uppercase text-center md:text-left">&copy; {new Date().getFullYear()} БИОЗИД. Строителство от бъдещето.</p>
-        </div>
-      </footer>
+      {/* 7. FOOTER (Изнесеният компонент с новите социални иконки) */}
+      <Footer />
+      
     </main>
   );
 }
