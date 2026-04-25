@@ -17,11 +17,12 @@ export default function Navbar() {
   }, [isMobileMenuOpen]);
 
   return (
-    <nav className="fixed top-0 w-full z-[100] bg-white/95 backdrop-blur-md border-b border-gray-100 transition-all duration-300">
-      <div className="flex items-center justify-between px-4 md:px-10 h-20 md:h-24 max-w-[1800px] mx-auto">
+    // Плътен бял фон (bg-white) без прозрачност, за да няма застъпване на мобилни
+    <nav className="fixed top-0 w-full z-[200] bg-white border-b border-gray-100 transition-all duration-300">
+      <div className="flex items-center justify-between px-4 md:px-10 h-20 md:h-24 max-w-[1800px] mx-auto bg-white relative z-[201]">
         
-        {/* АДАПТИВНО ЛОГО (По-малко на телефон, голямо на десктоп) */}
-        <Link href="/" className="relative z-10 cursor-pointer flex items-center" onClick={() => setIsMobileMenuOpen(false)}>
+        {/* АДАПТИВНО ЛОГО */}
+        <Link href="/" className="relative cursor-pointer flex items-center" onClick={() => setIsMobileMenuOpen(false)}>
           <Image 
             src="/logo.png" 
             alt="БИОЗИД" 
@@ -49,7 +50,7 @@ export default function Navbar() {
           {/* БУТОН ЗА МОБИЛНО МЕНЮ */}
           <button 
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
-            className="lg:hidden text-slate-900 p-2 text-2xl relative z-10 focus:outline-none"
+            className="lg:hidden text-slate-900 p-2 text-2xl focus:outline-none"
             aria-label="Toggle menu"
           >
             {isMobileMenuOpen ? '✕' : '☰'}
@@ -57,27 +58,25 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* МОБИЛНО МЕНЮ НА ЦЯЛ ЕКРАН */}
-      <div 
-        className={`lg:hidden fixed inset-0 top-[80px] bg-white z-[90] transition-transform duration-300 ease-in-out ${
-          isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
-        <div className="flex flex-col h-full p-6 justify-between overflow-y-auto pb-24">
-          <div className="flex flex-col space-y-6 text-center font-bold tracking-widest text-sm uppercase mt-10">
-            <Link href="/" className="py-4 border-b border-slate-50 hover:text-teal-700 transition" onClick={() => setIsMobileMenuOpen(false)}>Начало</Link>
-            <Link href="/houses" className="py-4 border-b border-slate-50 hover:text-teal-700 transition" onClick={() => setIsMobileMenuOpen(false)}>Къщи</Link>
-            <Link href="/processes" className="py-4 border-b border-slate-50 hover:text-teal-700 transition" onClick={() => setIsMobileMenuOpen(false)}>Процеси</Link>
-            <Link href="/advantages" className="py-4 border-b border-slate-50 hover:text-teal-700 transition" onClick={() => setIsMobileMenuOpen(false)}>Предимства</Link>
-            <Link href="/technology" className="py-4 border-b border-slate-50 hover:text-teal-700 transition" onClick={() => setIsMobileMenuOpen(false)}>Технология</Link>
-            <Link href="/calculator" className="py-4 text-teal-700 border-b border-slate-50" onClick={() => setIsMobileMenuOpen(false)}>Калкулатор</Link>
+      {/* МОБИЛНО МЕНЮ (Плътен падащ панел) */}
+      {isMobileMenuOpen && (
+        <div className="lg:hidden absolute top-full left-0 w-full bg-white shadow-[0_20px_40px_rgba(0,0,0,0.1)] flex flex-col z-[190] max-h-[calc(100vh-80px)] overflow-y-auto">
+          <div className="flex flex-col text-center font-bold tracking-widest text-[11px] uppercase px-6">
+            <Link href="/" className="py-5 border-b border-slate-100 text-slate-800 hover:text-teal-700" onClick={() => setIsMobileMenuOpen(false)}>Начало</Link>
+            <Link href="/houses" className="py-5 border-b border-slate-100 text-slate-800 hover:text-teal-700" onClick={() => setIsMobileMenuOpen(false)}>Къщи</Link>
+            <Link href="/processes" className="py-5 border-b border-slate-100 text-slate-800 hover:text-teal-700" onClick={() => setIsMobileMenuOpen(false)}>Процеси</Link>
+            <Link href="/advantages" className="py-5 border-b border-slate-100 text-slate-800 hover:text-teal-700" onClick={() => setIsMobileMenuOpen(false)}>Предимства</Link>
+            <Link href="/technology" className="py-5 border-b border-slate-100 text-slate-800 hover:text-teal-700" onClick={() => setIsMobileMenuOpen(false)}>Технология</Link>
+            <Link href="/calculator" className="py-5 border-b border-slate-100 text-teal-700" onClick={() => setIsMobileMenuOpen(false)}>Калкулатор</Link>
           </div>
           
-          <Link href="/contacts" className="bg-slate-900 text-white text-center py-5 rounded-2xl uppercase tracking-widest text-[11px] mt-10 shadow-lg" onClick={() => setIsMobileMenuOpen(false)}>
-            Свържете се с нас
-          </Link>
+          <div className="p-6">
+            <Link href="/contacts" className="block w-full bg-slate-900 text-white text-center py-4 rounded-xl uppercase tracking-widest text-[10px] shadow-lg" onClick={() => setIsMobileMenuOpen(false)}>
+              Свържете се с нас
+            </Link>
+          </div>
         </div>
-      </div>
+      )}
     </nav>
   );
 }
