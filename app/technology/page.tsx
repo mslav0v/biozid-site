@@ -40,7 +40,7 @@ export default function TechnologyPage() {
           <div className="bg-white rounded-[32px] md:rounded-[40px] p-6 sm:p-8 md:p-16 shadow-xl border border-slate-100 mb-20 md:mb-32 grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
             <div className="relative aspect-square md:aspect-[4/3] rounded-2xl overflow-hidden bg-slate-100">
               <Image 
-                src="/tech-layers.jpg" 
+                src="/tech-layers1.jpg" 
                 alt="Разрез на стената БИОЗИД" 
                 fill 
                 className="object-cover mix-blend-multiply" 
