@@ -19,13 +19,11 @@ export default function TechnologyPage() {
     <main className="min-h-screen bg-slate-50">
       <Navbar />
 
-      {/* Оптимизиран падинг: pt-28 */}
       <div className="pt-28 md:pt-44 pb-20">
         <div className="container mx-auto px-4 md:px-6 max-w-[1400px]">
           
           <div className="text-center mb-16 md:mb-24 max-w-4xl mx-auto px-2">
             <h4 className="text-[10px] font-bold tracking-[0.4em] uppercase text-teal-700 mb-6">Инженерство</h4>
-            {/* Оптимизиран размер на заглавието: text-3xl */}
             <h1 className="text-3xl md:text-5xl lg:text-6xl font-light tracking-tighter text-slate-900 leading-tight mb-6 md:mb-8">
               Анатомия на <br />
               <span className="italic text-teal-700 font-medium">перфектната сграда</span>
@@ -36,16 +34,18 @@ export default function TechnologyPage() {
           </div>
 
           {/* Секция: Анатомия на стената */}
-          {/* Оптимизиран вътрешен падинг p-6 за телефони */}
           <div className="bg-white rounded-[32px] md:rounded-[40px] p-6 sm:p-8 md:p-16 shadow-xl border border-slate-100 mb-20 md:mb-32 grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
-            <div className="relative aspect-square md:aspect-[4/3] rounded-2xl overflow-hidden bg-slate-100">
+            
+            {/* ОПТИМИЗИРАН КОНТЕЙНЕР ЗА СНИМКАТА */}
+            <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden bg-slate-100/50 flex items-center justify-center p-2 md:p-0">
               <Image 
                 src="/tech-layers1.jpg" 
                 alt="Разрез на стената БИОЗИД" 
                 fill 
-                className="object-cover mix-blend-multiply" 
+                className="object-contain md:object-cover mix-blend-multiply" 
               />
             </div>
+
             <div>
               <h3 className="text-2xl md:text-3xl font-light text-slate-900 mb-8 tracking-tight">Многослойна система на защита</h3>
               <div className="space-y-6">
