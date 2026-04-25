@@ -11,17 +11,29 @@ datasource db {
 
 // Модел за Каталога с Къщи
 model House {
-  id           String   @id @default(cuid())
-  name         String
-  area         Float    // Квадратура
-  bedrooms     Int      // Брой спални
-  bathrooms    Int      // Брой бани
-  floors       Int      // Етажи
-  price        String   // Цена (напр. "от 120,000 €")
-  description  String?  @db.Text
-  imageUrl     String?  // Път към снимката
-  tags         String[] // Тагове (напр. ["Енергоефективна", "Премиум"])
-  createdAt    DateTime @default(now())
+  id               String   @id @default(cuid())
+  name             String
+  area             Float    // Квадратура
+  bedrooms         Int      // Брой спални
+  bathrooms        Int      // Брой бани
+  toilets          Int      @default(1) // Брой тоалетни
+  floors           Int      @default(1) // Етажи
+  terraces         Int      @default(0) // Тераси
+  price            String   // Цена (съхраняваме я като чист низ "250000")
+  description      String?  @db.Text
+  imageUrl         String?  // Път към снимката
+  tags             String[] // Тагове (напр. ["Енергоефективна", "Премиум"])
+
+  // ТЕХНИЧЕСКИ ХАРАКТЕРИСТИКИ
+  constructionType String?  // Вид конструкция (напр. "Масивна метална")
+  profileSize      String?  // Размери на профилите (напр. "100х100х5 мм")
+  wallThickness    String?  // Дебелина на стената (напр. "25 см")
+  wallTech         String?  // Технология на стената (напр. "Дишаща система БИОЗИД")
+  roofType         String?  // Вид покрив (напр. "Двускатен / Плосък")
+  windowsType      String?  // Вид дограма (напр. "7-камерна PVC, троен стъклопакет")
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 }
 
 // Модел за Клиентските заявки от Калкулатора
@@ -32,7 +44,7 @@ model QuoteRequest {
   totalArea     Float
   status        String   @default("new") // new, in_progress, completed
   underlayUrl   String?  // Линк към качената подложка (чертеж)
-  cadData       Json?    // Тук ще пазим целия масив със стени и панели за CAD редактора
+  cadData       Json?    // Тук пазим целия масив със стени и панели за CAD редактора
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
