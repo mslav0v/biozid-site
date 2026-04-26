@@ -6,7 +6,9 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Text, Edges } from '@react-three/drei';
-import * as THREE from 'three';
+import * as THREE from 'three'; // КОРИГИРАНО: Използваме стандартния пакет three
+import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
 
 // ЗАЩИТЕН ИМПОРТ НА FABRIC.JS ЗА NEXT.JS (TURBOPACK)
 let fabric: any = null;
@@ -61,7 +63,7 @@ export default function Calculator() {
   const [unit, setUnit] = useState<'cm' | 'm'>('cm');
   
   const [floors, setFloors] = useState<any[]>([
-    { id: 1, name: 'Етаж 1', walls: [], markedPoints: [], underlay: null, ppm: null, height: 2.80, bgOffsetX: 0, bgOffsetY: 0, bgScale: 1 }
+    { id: 1, name: 'Етаж 1', walls: [], markedPoints: [], underlay: null, ppm: null, height: 2.80, bgOffsetX: 0, bgOffsetY: 0, bgScaleX: 1, bgScaleY: 1 }
   ]);
   const [activeFloorId, setActiveFloorId] = useState<number>(1);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
@@ -69,16 +71,20 @@ export default function Calculator() {
   
   const [clientName, setClientName] = useState('');
   const [clientPhone, setClientPhone] = useState('');
+  const [clientEmail, setClientEmail] = useState(''); 
   const [clientLocation, setClientLocation] = useState('');
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvas = useRef<any>(null);
-  const [drawingMode, setDrawingMode] = useState<'none' | 'wall' | 'point'>('none'); 
+  const adjustIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const [drawingMode, setDrawingMode] = useState<'none' | 'wall' | 'point' | 'move-bg'>('none'); 
   const [wallType, setWallType] = useState<'Външна' | 'Вътрешна'>('Външна');
   
   const [pixelsPerMeter, setPixelsPerMeter] = useState<number | null>(null);
   const [calibrationModal, setCalibrationModal] = useState<boolean>(false);
   const [calibAreaInput, setCalibAreaInput] = useState<string>(''); 
+  const [calibLengthInput, setCalibLengthInput] = useState<string>(''); 
   const [calibHeightInput, setCalibHeightInput] = useState<string>('280');
 
   const [editingWallId, setEditingWallId] = useState<string | null>(null);
@@ -90,6 +96,9 @@ export default function Calculator() {
   const [projectResult, setProjectResult] = useState<any>(null);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [orderStatus, setOrderStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
+
+  // Филтър за 3D сцената и печат
+  const [filter3DFloor, setFilter3DFloor] = useState<number | 'all'>('all');
 
   const stateRefs = useRef({
       drawingMode, wallType, floors, activeFloorId, activeFloorIndex: floors.findIndex(f => f.id === activeFloorId), unit, pixelsPerMeter, actionHistory, globalWallHeight
@@ -111,11 +120,11 @@ export default function Calculator() {
 
   const handleAddFloor = () => {
       const newId = floors.length > 0 ? Math.max(...floors.map(f => f.id)) + 1 : 1;
-      const inheritPpm = floors[0]?.ppm || null;
-      const newFloor = { id: newId, name: `Етаж ${newId}`, walls: [], markedPoints: [], underlay: null, ppm: inheritPpm, height: 2.80, bgOffsetX: 0, bgOffsetY: 0, bgScale: 1 };
+      const inheritPpm = floors.length > 0 ? floors[floors.length - 1].ppm : null;
+      const newFloor = { id: newId, name: `Етаж ${newId}`, walls: [], markedPoints: [], underlay: null, ppm: inheritPpm, height: 2.80, bgOffsetX: 0, bgOffsetY: 0, bgScaleX: 1, bgScaleY: 1 };
       setFloors(prev => [...prev, newFloor]);
       setActiveFloorId(newId);
-      setViewMode('2D'); // Автоматично превключване към 2D
+      setViewMode('2D'); 
   };
 
   const saveWallToState = (wallId: string, displayId: string, lengthInMeters: number, coords: any) => {
@@ -129,11 +138,10 @@ export default function Calculator() {
       setActionHistory(prev => [...prev, { type: 'wall', floorId: stateRefs.current.activeFloorId, elementId: wallId }]);
   };
 
-  const updateCanvasBackground = useCallback((imageUrl: string | null, offsetX = 0, offsetY = 0, customScale = 1) => {
+  const updateCanvasBackground = useCallback((imageUrl: string | null, offsetX = 0, offsetY = 0, customScaleX = 1, customScaleY = 1) => {
     if (!fabricCanvas.current || !fabric) return;
     const canvas = fabricCanvas.current;
 
-    // Изчистване на подложката, ако няма такава за етажа
     if (!imageUrl) {
         if (typeof canvas.setBackgroundImage === 'function') {
             canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas));
@@ -152,13 +160,14 @@ export default function Calculator() {
       const canvasH = canvas.height || canvas.getHeight?.() || 600;
       
       const baseScale = Math.min(canvasW / img.width, canvasH / img.height) * 0.9;
-      const finalScale = baseScale * customScale;
+      const finalScaleX = baseScale * customScaleX;
+      const finalScaleY = baseScale * customScaleY;
       
       img.set({ 
           originX: 'center', originY: 'center', 
           left: (canvasW / 2) + offsetX, 
           top: (canvasH / 2) + offsetY, 
-          scaleX: finalScale, scaleY: finalScale, 
+          scaleX: finalScaleX, scaleY: finalScaleY, 
           opacity: 0.5, selectable: false, evented: false 
       });
       
@@ -174,56 +183,79 @@ export default function Calculator() {
 
   useEffect(() => {
     if (viewMode === '2D' && activeFloor) {
-        updateCanvasBackground(activeFloor.underlay, activeFloor.bgOffsetX, activeFloor.bgOffsetY, activeFloor.bgScale);
+        updateCanvasBackground(activeFloor.underlay, activeFloor.bgOffsetX, activeFloor.bgOffsetY, activeFloor.bgScaleX, activeFloor.bgScaleY);
     }
-  }, [activeFloor?.underlay, activeFloor?.bgOffsetX, activeFloor?.bgOffsetY, activeFloor?.bgScale, viewMode, updateCanvasBackground]);
+  }, [activeFloor?.underlay, activeFloor?.bgOffsetX, activeFloor?.bgOffsetY, activeFloor?.bgScaleX, activeFloor?.bgScaleY, viewMode, updateCanvasBackground]);
 
-  const adjustBg = (type: 'x' | 'y' | 'scale', val: number) => {
+  // ДИРЕКТНО И ПРЕЦИЗНО ЗАДАВАНЕ НА СТОЙНОСТИ ОТ ИНПУТИ И БУТОНИ (ВКЛЮЧИТЕЛНО ЗАДЪРЖАНЕ)
+  const setBgDirectly = (type: 'x' | 'y' | 'scaleX' | 'scaleY', valDelta: number) => {
       setFloors(prev => prev.map(f => {
           if (f.id === activeFloorId) {
               const newF = { ...f };
-              if (type === 'x') newF.bgOffsetX = (f.bgOffsetX || 0) + val;
-              if (type === 'y') newF.bgOffsetY = (f.bgOffsetY || 0) + val;
-              if (type === 'scale') newF.bgScale = Math.max(0.1, (f.bgScale || 1) + val);
+              if (type === 'x') newF.bgOffsetX = (newF.bgOffsetX || 0) + valDelta;
+              if (type === 'y') newF.bgOffsetY = (newF.bgOffsetY || 0) + valDelta;
+              if (type === 'scaleX') newF.bgScaleX = Math.max(0.01, (newF.bgScaleX || 1) + valDelta);
+              if (type === 'scaleY') newF.bgScaleY = Math.max(0.01, (newF.bgScaleY || 1) + valDelta);
               return newF;
           }
           return f;
       }));
   };
 
+  const startAdjust = (type: 'x' | 'y' | 'scaleX' | 'scaleY', valDelta: number) => {
+      setBgDirectly(type, valDelta); // Първоначално натискане
+      adjustIntervalRef.current = setInterval(() => {
+          setBgDirectly(type, valDelta);
+      }, 50); // Бързина на автоматичното коригиране при задържане
+  };
+
+  const stopAdjust = () => {
+      if (adjustIntervalRef.current) {
+          clearInterval(adjustIntervalRef.current);
+          adjustIntervalRef.current = null;
+      }
+  };
+
   const getSafePointer = (o: any, canvas: any) => {
       if (!canvas) return { x: 0, y: 0 };
-      if (typeof canvas.getPointer === 'function') return canvas.getPointer(o.e);
       if (o.scenePoint) return o.scenePoint;
       if (o.pointer) return o.pointer;
       
+      try {
+          if (typeof canvas.getPointer === 'function' && o.e) {
+              return canvas.getPointer(o.e);
+          }
+      } catch (e) {
+      }
+      
       const rect = canvas.getElement().getBoundingClientRect();
       return {
-          x: (o.e.clientX || o.e.touches?.[0]?.clientX) - rect.left,
-          y: (o.e.clientY || o.e.touches?.[0]?.clientY) - rect.top
+          x: (o.e?.clientX || o.e?.touches?.[0]?.clientX || 0) - rect.left,
+          y: (o.e?.clientY || o.e?.touches?.[0]?.clientY || 0) - rect.top
       };
   };
 
-  // --- КОРИГИРАНА ФУНКЦИЯ ЗА ПУНКТИРИ И ПОДРЕЖДАНЕ НА ТОЧКИ ---
-  const redrawGuideLines = useCallback((canvas: any, points: any[]) => {
+  const redrawGuideLines = useCallback((canvas: any, points: any[], isCalibratingState: boolean = false) => {
       if (!canvas) return;
       
-      // Премахваме старите линии
       const objects = canvas.getObjects();
       objects.forEach((obj: any) => {
           if (obj.customType === 'guide-line') canvas.remove(obj);
       });
       
-      // Добавяме новите пунктирани линии
       if (points.length > 1) {
           for (let i = 1; i < points.length; i++) {
+              // При режим калибриране, първата линия се оцветява в червено за визуален ориентир
+              const isFirstLine = i === 1 && isCalibratingState;
+              const lineStroke = isFirstLine ? '#ef4444' : 'rgba(244, 63, 94, 0.6)';
+              const strokeW = isFirstLine ? 4 : 2;
+              
               const line = new fabric.Line([points[i-1].x, points[i-1].y, points[i].x, points[i].y], {
-                  stroke: 'rgba(244, 63, 94, 0.6)', strokeWidth: 2, strokeDashArray: [5, 5], selectable: false, evented: false, customType: 'guide-line'
+                  stroke: lineStroke, strokeWidth: strokeW, strokeDashArray: [5, 5], selectable: false, evented: false, customType: 'guide-line'
               });
               canvas.add(line);
           }
       }
-      // Затваряме фигурата визуално
       if (points.length > 2) {
           const line = new fabric.Line([points[points.length-1].x, points[points.length-1].y, points[0].x, points[0].y], {
               stroke: 'rgba(244, 63, 94, 0.6)', strokeWidth: 2, strokeDashArray: [5, 5], selectable: false, evented: false, customType: 'guide-line'
@@ -231,7 +263,6 @@ export default function Calculator() {
           canvas.add(line);
       }
 
-      // Изтегляме всички червени точки най-отпред, за да не се закриват от линиите
       canvas.getObjects().forEach((obj: any) => {
           if (obj.type === 'circle') {
               if (typeof canvas.bringToFront === 'function') canvas.bringToFront(obj);
@@ -289,11 +320,21 @@ export default function Calculator() {
 
       const canvas = fabricCanvas.current;
 
+      // ВЪЗСТАНОВЯВАНЕ НА ПОДЛОЖКАТА ПРИ ПРЕЗАРЕЖДАНЕ НА КАНВАСА (ФИКС ЗА ИЗЧЕЗВАЩАТА ПОДЛОЖКА)
+      const currentBgFloor = stateRefs.current.floors[stateRefs.current.activeFloorIndex];
+      if (currentBgFloor && currentBgFloor.underlay) {
+          updateCanvasBackground(currentBgFloor.underlay, currentBgFloor.bgOffsetX, currentBgFloor.bgOffsetY, currentBgFloor.bgScaleX, currentBgFloor.bgScaleY);
+      }
+
       let isDrawing = false;
       let currentLine: any = null;
       let startX = 0;
       let startY = 0;
       let tempElementId = '';
+      
+      let isDraggingBg = false;
+      let lastBgPosX = 0;
+      let lastBgPosY = 0;
 
       const applyMagneticSnap = (pt: {x: number, y: number}, excludePointId?: string) => {
           let snapX = pt.x; 
@@ -318,6 +359,14 @@ export default function Calculator() {
       };
 
       canvas.on('mouse:down', (o: any) => {
+        if (stateRefs.current.drawingMode === 'move-bg') {
+            isDraggingBg = true;
+            const pointer = getSafePointer(o, canvas);
+            lastBgPosX = pointer.x;
+            lastBgPosY = pointer.y;
+            return;
+        }
+
         if (o.target && o.target.type === 'circle') return;
 
         let pointer = getSafePointer(o, canvas);
@@ -327,7 +376,7 @@ export default function Calculator() {
         if (stateRefs.current.drawingMode === 'point') {
             const pointId = generateUniqueId();
             const circle = new fabric.Circle({ 
-                radius: 4, fill: '#f43f5e', left: pointer.x, top: pointer.y, // РАДИУС 4 ЗА ФИННИ ТОЧКИ
+                radius: 4, fill: '#f43f5e', left: pointer.x, top: pointer.y,
                 originX: 'center', originY: 'center', customId: pointId, 
                 selectable: true, hasControls: false, hasBorders: false, hoverCursor: 'move' 
             });
@@ -339,7 +388,7 @@ export default function Calculator() {
             setFloors(prev => prev.map(f => f.id === stateRefs.current.activeFloorId ? { ...f, markedPoints: newPoints } : f));
             setActionHistory(prev => [...prev, { type: 'point', floorId: stateRefs.current.activeFloorId, elementId: pointId }]);
             
-            redrawGuideLines(canvas, newPoints);
+            redrawGuideLines(canvas, newPoints, false);
             return;
         }
 
@@ -349,7 +398,8 @@ export default function Calculator() {
         startX = pointer.x; startY = pointer.y;
         tempElementId = generateUniqueId();
         
-        let strokeColor = stateRefs.current.wallType === 'Външна' ? '#0d9488' : '#64748b'; 
+        let isSecondFloorOrAbove = stateRefs.current.activeFloorId > stateRefs.current.floors[0].id;
+        let strokeColor = stateRefs.current.wallType === 'Външна' ? (isSecondFloorOrAbove ? '#3b82f6' : '#0d9488') : '#64748b'; 
         let strokeWidth = stateRefs.current.wallType === 'Външна' ? 6 : 4;
 
         currentLine = new fabric.Line([startX, startY, startX, startY], {
@@ -359,6 +409,21 @@ export default function Calculator() {
       });
 
       canvas.on('mouse:move', (o: any) => {
+        if (stateRefs.current.drawingMode === 'move-bg' && isDraggingBg) {
+            const pointer = getSafePointer(o, canvas);
+            const dx = pointer.x - lastBgPosX;
+            const dy = pointer.y - lastBgPosY;
+            lastBgPosX = pointer.x;
+            lastBgPosY = pointer.y;
+
+            if (canvas.backgroundImage) {
+                canvas.backgroundImage.left += dx;
+                canvas.backgroundImage.top += dy;
+                canvas.renderAll();
+            }
+            return;
+        }
+
         if (!isDrawing || !currentLine) return;
         let pointer = getSafePointer(o, canvas);
         if (!pointer) return;
@@ -381,6 +446,19 @@ export default function Calculator() {
       });
 
       canvas.on('mouse:up', () => {
+        if (stateRefs.current.drawingMode === 'move-bg') {
+            isDraggingBg = false;
+            if (canvas.backgroundImage) {
+                 const canvasW = canvas.width || canvas.getWidth?.() || 800;
+                 const canvasH = canvas.height || canvas.getHeight?.() || 600;
+                 const finalOffsetX = canvas.backgroundImage.left - (canvasW / 2);
+                 const finalOffsetY = canvas.backgroundImage.top - (canvasH / 2);
+
+                 setFloors(prev => prev.map(f => f.id === stateRefs.current.activeFloorId ? { ...f, bgOffsetX: finalOffsetX, bgOffsetY: finalOffsetY } : f));
+            }
+            return;
+        }
+
         if (!isDrawing || !currentLine) return;
         isDrawing = false;
         
@@ -400,7 +478,7 @@ export default function Calculator() {
             currentLine.set({ customId: wallId });
 
             if (!stateRefs.current.pixelsPerMeter) {
-                alert("Моля, първо калибрирайте етажа, като маркирате ъглите му и въведете общата площ.");
+                alert("Моля, първо калибрирайте етажа, като въведете дължината на начертаната стена.");
                 canvas.remove(currentLine);
                 setDrawingMode('none');
             } else {
@@ -411,7 +489,6 @@ export default function Calculator() {
         currentLine = null;
       });
 
-      // --- ВЛАЧЕНЕ НА ЪГЛИТЕ ---
       canvas.on('object:moving', (o: any) => {
           if (o.target && o.target.type === 'circle') {
               let snapped = applyMagneticSnap({ x: o.target.left, y: o.target.top }, o.target.customId);
@@ -422,7 +499,7 @@ export default function Calculator() {
               const newPoints = currentFloor.markedPoints.map((p: any) => 
                   p.id === pointId ? { ...p, x: snapped.x, y: snapped.y } : p
               );
-              redrawGuideLines(canvas, newPoints);
+              redrawGuideLines(canvas, newPoints, calibrationModal);
           }
       });
 
@@ -438,22 +515,35 @@ export default function Calculator() {
           }
       });
 
-      // Зареждаме съществуващите обекти за етажа
       const currentFloorData = stateRefs.current.floors[stateRefs.current.activeFloorIndex];
       if (currentFloorData) {
         
+        // GHOSTING от предния етаж
         const prevFloor = stateRefs.current.floors.find(f => f.id === currentFloorData.id - 1);
         if (prevFloor) {
+            // Сенки на стените (в жълто, малко по-дебели от червения контур)
             prevFloor.walls.forEach((w: any) => {
                 const line = new fabric.Line([w.coords.x1, w.coords.y1, w.coords.x2, w.coords.y2], {
-                    strokeWidth: 4, stroke: '#94a3b8', strokeDashArray: [5, 5], opacity: 0.5, selectable: false, evented: false
+                    strokeWidth: 4, stroke: '#facc15', strokeDashArray: [6, 6], opacity: 0.8, selectable: false, evented: false
                 });
                 canvas.add(line);
             });
+            // Сенки на точките (светло синьо)
+            if (prevFloor.markedPoints && prevFloor.markedPoints.length > 0) {
+                 prevFloor.markedPoints.forEach((p: any) => {
+                     const circle = new fabric.Circle({ 
+                         radius: 4, fill: '#38bdf8', left: p.x, top: p.y,
+                         originX: 'center', originY: 'center', opacity: 0.6,
+                         selectable: false, evented: false
+                     });
+                     canvas.add(circle);
+                 });
+            }
         }
 
         currentFloorData.walls.forEach((w: any) => {
-            let strokeColor = w.type === 'Външна' ? '#0d9488' : '#64748b'; 
+            let isSecondFloorOrAbove = currentFloorData.id > stateRefs.current.floors[0].id;
+            let strokeColor = w.type === 'Външна' ? (isSecondFloorOrAbove ? '#3b82f6' : '#0d9488') : '#64748b'; 
             let strokeWidth = w.type === 'Външна' ? 6 : 4;
             const line = new fabric.Line([w.coords.x1, w.coords.y1, w.coords.x2, w.coords.y2], {
               strokeWidth, fill: strokeColor, stroke: strokeColor, originX: 'center', originY: 'center', selectable: false, evented: false, strokeLineCap: 'round', customId: w.id
@@ -464,13 +554,13 @@ export default function Calculator() {
         if (currentFloorData.markedPoints.length > 0) {
             currentFloorData.markedPoints.forEach((p: any) => {
                 const circle = new fabric.Circle({ 
-                    radius: 4, fill: '#f43f5e', left: p.x, top: p.y, // РАДИУС 4
+                    radius: 4, fill: '#f43f5e', left: p.x, top: p.y,
                     originX: 'center', originY: 'center', customId: p.id, 
                     selectable: true, hasControls: false, hasBorders: false, hoverCursor: 'move'
                 });
                 canvas.add(circle);
             });
-            redrawGuideLines(canvas, currentFloorData.markedPoints);
+            redrawGuideLines(canvas, currentFloorData.markedPoints, calibrationModal);
         }
       }
     }
@@ -486,8 +576,7 @@ export default function Calculator() {
     };
     window.addEventListener('resize', handleResize);
     return () => { window.removeEventListener('resize', handleResize); if (fabricCanvas.current) { fabricCanvas.current.dispose(); fabricCanvas.current = null; }};
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode, activeFloorId, redrawGuideLines]); 
+  }, [viewMode, activeFloorId, redrawGuideLines, calibrationModal, updateCanvasBackground]); 
 
   const handleWallEditSave = (wallId: string) => {
       const newL = parseFloat(editValue);
@@ -554,56 +643,45 @@ export default function Calculator() {
       setEditingWallId(null);
   };
 
+  const openCalibrationModal = () => {
+      setCalibrationModal(true);
+      if (fabricCanvas.current && activeFloor && activeFloor.markedPoints.length >= 2) {
+          redrawGuideLines(fabricCanvas.current, activeFloor.markedPoints, true); // True за оцветяване в червено
+      }
+  };
+
   const handleAreaCalibrationSubmit = () => {
-      const realArea = parseFloat(calibAreaInput);
+      const realLength = parseFloat(calibLengthInput);
       const hVal = parseFloat(calibHeightInput);
 
-      if(!realArea || realArea <= 0 || !hVal || hVal <= 0 || !activeFloor || activeFloor.markedPoints.length < 3) {
-          alert("Моля, въведете валидна площ и височина.");
+      if(!realLength || realLength <= 0 || !hVal || hVal <= 0 || !activeFloor || activeFloor.markedPoints.length < 2) {
+          alert("Моля, въведете валидна дължина на стената и височина.");
           return;
       }
 
       const points = activeFloor.markedPoints;
-      const pixelArea = calculatePolygonArea(points);
-      
-      if (pixelArea === 0) {
-          alert("Маркираните точки не образуват валиден многоъгълник.");
-          return;
-      }
+      // Взимаме разстоянието само на ПЪРВАТА линия (червената)
+      const p1 = points[0];
+      const p2 = points[1];
+      const lineLengthPixels = Math.hypot(p2.x - p1.x, p2.y - p1.y);
 
-      const ppm = Math.sqrt(pixelArea / realArea);
+      const lengthInMeters = unit === 'cm' ? realLength / 100 : realLength;
+      const ppm = lineLengthPixels / lengthInMeters;
       const wallHeightInMeters = unit === 'cm' ? hVal / 100 : hVal;
       
       setPixelsPerMeter(ppm);
       setGlobalWallHeight(wallHeightInMeters);
 
-      const newWalls: any[] = [];
-      for (let i = 0; i < points.length; i++) {
-          const p1 = points[i];
-          const p2 = points[(i + 1) % points.length];
-          const lengthInPixels = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-          const wallId = `wall-auto-${generateUniqueId()}`;
-          const displayId = getWallLetter(activeFloor.walls.length + newWalls.length);
-
-          newWalls.push({
-              id: wallId, displayId: displayId, length: lengthInPixels / ppm, height: wallHeightInMeters, type: 'Външна', cutouts: [], coords: { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y }
-          });
-      }
-      
       setFloors(prev => prev.map(f => {
-          if (f.id === activeFloorId) return { ...f, ppm: ppm, height: wallHeightInMeters, walls: [...f.walls, ...newWalls], markedPoints: [] };
+          if (f.id === activeFloorId) return { ...f, ppm: ppm, height: wallHeightInMeters };
           return f;
       }));
 
       if (fabricCanvas.current) {
-          fabricCanvas.current.getObjects().forEach((obj: any) => {
-              if (obj.type === 'circle' || obj.customType === 'guide-line') fabricCanvas.current.remove(obj);
-          });
-          fabricCanvas.current.renderAll();
+          redrawGuideLines(fabricCanvas.current, points, false); // Връщаме нормалния цвят
       }
 
       setCalibrationModal(false); 
-      setCalibAreaInput(''); 
       setDrawingMode('wall');
   };
 
@@ -632,12 +710,25 @@ export default function Calculator() {
       }));
 
       if (fabricCanvas.current) {
-          fabricCanvas.current.getObjects().forEach((obj: any) => {
-              if (obj.type === 'circle' || obj.customType === 'guide-line') fabricCanvas.current.remove(obj);
+          // ФИКС за пропускане на обекти при изтриване: филтрираме ги първо в нов масив
+          const objectsToRemove = fabricCanvas.current.getObjects().filter((obj: any) => obj.type === 'circle' || obj.customType === 'guide-line');
+          objectsToRemove.forEach((obj: any) => fabricCanvas.current.remove(obj));
+          
+          // Директно добавяме и рендираме стените, за да се видят веднага
+          newWalls.forEach((w: any) => {
+              let isSecondFloorOrAbove = activeFloor.id > stateRefs.current.floors[0].id;
+              let strokeColor = isSecondFloorOrAbove ? '#3b82f6' : '#0d9488'; 
+              const line = new fabric.Line([w.coords.x1, w.coords.y1, w.coords.x2, w.coords.y2], {
+                  strokeWidth: 6, fill: strokeColor, stroke: strokeColor, originX: 'center', originY: 'center', selectable: false, evented: false, strokeLineCap: 'round', customId: w.id
+              });
+              fabricCanvas.current.add(line);
           });
           fabricCanvas.current.renderAll();
       }
       setDrawingMode('wall');
+      
+      // Ясна обратна връзка за потребителя
+      alert('Външните стени бяха очертани успешно по контура! Вече можете да начертаете вътрешните стени.');
   };
 
   const getActiveWalls = () => floors.find(f => f.id === activeFloorId)?.walls || [];
@@ -728,6 +819,25 @@ export default function Calculator() {
     let allProcessedWalls: any[] = [];
     let currentElevation = 0;
 
+    // НОВО: Предварително изчисляване на центровете за всеки етаж в пиксели
+    const floorCenters: Record<string, {cx: number, cy: number, ppm: number}> = {};
+    floors.forEach(f => {
+        const extWalls = f.walls.filter((w:any) => w.type === 'Външна');
+        let fMinX = Infinity, fMaxX = -Infinity, fMinY = Infinity, fMaxY = -Infinity;
+        const targetWalls = extWalls.length > 0 ? extWalls : f.walls;
+        targetWalls.forEach((w:any) => {
+            fMinX = Math.min(fMinX, w.coords.x1, w.coords.x2);
+            fMaxX = Math.max(fMaxX, w.coords.x1, w.coords.x2);
+            fMinY = Math.min(fMinY, w.coords.y1, w.coords.y2);
+            fMaxY = Math.max(fMaxY, w.coords.y1, w.coords.y2);
+        });
+        floorCenters[f.id] = {
+            cx: fMinX === Infinity ? 0 : (fMinX + fMaxX) / 2,
+            cy: fMinY === Infinity ? 0 : (fMinY + fMaxY) / 2,
+            ppm: f.ppm || 50
+        };
+    });
+
     floors.forEach((floor, fIndex) => {
         let cornerAdjustments: Record<string, number> = {};
         const extWalls = floor.walls.filter((w: any) => w.type === 'Външна');
@@ -749,37 +859,54 @@ export default function Calculator() {
         }
 
         floor.walls.forEach((wall: any) => {
+            const fData = floorCenters[floor.id];
+            // НОВО: Нормализиране на координатите в метри спрямо центъра на етажа
+            const mX1 = (wall.coords.x1 - fData.cx) / fData.ppm;
+            const mY1 = (wall.coords.y1 - fData.cy) / fData.ppm;
+            const mX2 = (wall.coords.x2 - fData.cx) / fData.ppm;
+            const mY2 = (wall.coords.y2 - fData.cy) / fData.ppm;
+
             allProcessedWalls.push({
                 ...wall,
                 floorIndex: fIndex,
-                structuralLength: wall.length + (cornerAdjustments[wall.id] || 0),
+                structuralLength: wall.type === 'Външна' ? wall.length + (cornerAdjustments[wall.id] || 0) : wall.length,
                 baseElevation: currentElevation,
-                merged: false 
+                merged: false,
+                mCoords: { x1: mX1, y1: mY1, x2: mX2, y2: mY2 }
             });
         });
-        currentElevation += floor.height || globalWallHeight;
+        
+        currentElevation += (Number(floor.height) || Number(globalWallHeight));
     });
 
     for (let i = 0; i < allProcessedWalls.length; i++) {
         let w1 = allProcessedWalls[i];
-        if (w1.merged || w1.type !== 'Външна') continue;
+        if (w1.merged) continue;
 
         let totalMergedHeight = w1.height;
         let mergedFloors = [w1.floorIndex];
+        let lastMergedWall = w1; 
 
-        for (let j = i + 1; j < allProcessedWalls.length; j++) {
-            let w2 = allProcessedWalls[j];
-            if (w2.merged || w2.type !== 'Външна' || w2.floorIndex <= w1.floorIndex) continue;
+        // Вътрешните стени не се сливат между етажите, само се оптимизират директно
+        if (w1.type === 'Външна') {
+            for (let j = i + 1; j < allProcessedWalls.length; j++) {
+                let w2 = allProcessedWalls[j];
+                
+                if (w2.merged || w2.type !== 'Външна' || w2.floorIndex !== lastMergedWall.floorIndex + 1) continue;
 
-            const d1 = Math.hypot(w1.coords.x1 - w2.coords.x1, w1.coords.y1 - w2.coords.y1);
-            const d2 = Math.hypot(w1.coords.x2 - w2.coords.x2, w1.coords.y2 - w2.coords.y2);
-            const d3 = Math.hypot(w1.coords.x1 - w2.coords.x2, w1.coords.y1 - w2.coords.y2); 
-            const d4 = Math.hypot(w1.coords.x2 - w2.coords.x1, w1.coords.y2 - w2.coords.y1);
+                // НОВО: Сравняваме нормализираните координати в метри, за да могат да се сливат перфектно дори при разминаване в пикселите
+                const d1 = Math.hypot(lastMergedWall.mCoords.x1 - w2.mCoords.x1, lastMergedWall.mCoords.y1 - w2.mCoords.y1);
+                const d2 = Math.hypot(lastMergedWall.mCoords.x2 - w2.mCoords.x2, lastMergedWall.mCoords.y2 - w2.mCoords.y2);
+                const d3 = Math.hypot(lastMergedWall.mCoords.x1 - w2.mCoords.x2, lastMergedWall.mCoords.y1 - w2.mCoords.y2); 
+                const d4 = Math.hypot(lastMergedWall.mCoords.x2 - w2.mCoords.x1, lastMergedWall.mCoords.y2 - w2.mCoords.y1);
 
-            if ((d1 < 35 && d2 < 35) || (d3 < 35 && d4 < 35)) {
-                totalMergedHeight += w2.height;
-                w2.merged = true;
-                mergedFloors.push(w2.floorIndex);
+                // Използваме толеранс от 1.2 метра разминаване за успешен съвпад на стените между различните етажи
+                if ((d1 < 1.2 && d2 < 1.2) || (d3 < 1.2 && d4 < 1.2)) {
+                    totalMergedHeight += w2.height;
+                    w2.merged = true;
+                    mergedFloors.push(w2.floorIndex);
+                    lastMergedWall = w2; 
+                }
             }
         }
 
@@ -802,10 +929,11 @@ export default function Calculator() {
     }
 
     setProjectResult({ walls: projectWalls, globalStats, floorsData: floors });
+    setFilter3DFloor(floors[0]?.id || 'all');
     setViewMode('3D');
   };
 
- const handleFileUpload = async (e: any) => {
+  const handleFileUpload = async (e: any) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -818,85 +946,182 @@ export default function Calculator() {
     reader.readAsDataURL(file);
   };
 
+  // ПОМОЩНА ФУНКЦИЯ ЗА КОНВЕРТИРАНЕ НА BASE64 КЪМ BLOB
+  const base64ToBlob = (base64: string) => {
+    const parts = base64.split(';base64,');
+    const contentType = parts[0].split(':')[1];
+    const raw = window.atob(parts[1]);
+    const rawLength = raw.length;
+    const uInt8Array = new Uint8Array(rawLength);
+    for (let i = 0; i < rawLength; ++i) {
+      uInt8Array[i] = raw.charCodeAt(i);
+    }
+    return new Blob([uInt8Array], { type: contentType });
+  };
+
+  // ОБНОВЕНО ИЗПРАЩАНЕ НА ЗАЯВКАТА С ИМЕЙЛ И ФАЙЛ
   const handleSubmitQuote = async () => {
-    if (!clientName || !clientPhone || !clientLocation) {
-      alert("Моля, попълнете всички Ваши данни, включително населено място.");
+    if (!clientName || !clientPhone || !clientLocation || !clientEmail) {
+      alert("Моля, попълнете всички данни за контакт, включително имейл адрес.");
       return;
     }
+    
     setOrderStatus('sending');
+
     try {
+      // 1. Първо записваме в базата данни (api/quotes) за статистиката в админ панела
       const payload = {
-        clientName, clientPhone, clientLocation,
+        clientName, clientPhone, clientLocation, clientEmail,
         totalArea: projectResult?.globalStats.totalAreaUsed || 0,
-        underlayUrl: floors[0].underlay,
+        underlayUrl: floors[0].underlay, 
+        floorsData: floors.map(f => ({
+            floorId: f.id,
+            floorName: f.name,
+            underlay: f.underlay,
+            walls: projectResult?.walls.filter((w: any) => w.floorId === f.id) || [],
+            ppm: f.ppm,
+            bgConfig: { x: f.bgOffsetX, y: f.bgOffsetY, scaleX: f.bgScaleX, scaleY: f.bgScaleY }
+        })),
         cadData: projectResult?.walls || []
       };
-      const res = await fetch('/api/quotes', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+
+      await fetch('/api/quotes', {
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify(payload)
       });
-      if (res.ok) {
+
+      // 2. Второ: Подготвяме имейла през универсалното API (api/contact)
+      const summaryMessage = `
+        НОВА ЗАЯВКА ОТ КАЛКУЛАТОРА
+        ----------------------------------
+        Клиент: ${clientName}
+        Локация: ${clientLocation}
+        Телефон: ${clientPhone}
+        ----------------------------------
+        РЕЗУЛТАТИ ОТ ПРОЕКТА:
+        Обща площ панели: ${payload.totalArea.toFixed(2)} м²
+        Панели тип А: ${projectResult?.globalStats.aFull} бр.
+        Панели тип Б: ${projectResult?.globalStats.bFull} бр.
+        Брой етажи: ${floors.length}
+        Брой стени общо: ${projectResult?.walls.length}
+      `;
+
+      const formData = new FormData();
+      formData.append('name', clientName);
+      formData.append('phone', clientPhone);
+      formData.append('email', clientEmail);
+      formData.append('message', summaryMessage);
+
+      // Ако има подложка на първия етаж, я превръщаме във файл и я прикачваме
+      if (floors[0].underlay) {
+        const fileBlob = base64ToBlob(floors[0].underlay);
+        formData.append('file', fileBlob, 'floor-plan.png');
+      }
+
+      const emailRes = await fetch('/api/contact', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (emailRes.ok) {
         setOrderStatus('success');
-        setTimeout(() => { setIsOrderModalOpen(false); setOrderStatus('idle'); }, 2000);
-      } else { throw new Error(); }
+        setTimeout(() => { 
+          setIsOrderModalOpen(false); 
+          setOrderStatus('idle'); 
+        }, 2500);
+      } else {
+        throw new Error("Грешка при имейл сървъра");
+      }
+
     } catch (err) {
-      alert("Възникна грешка при изпращането.");
+      console.error("Грешка:", err);
+      alert("Възникна грешка при изпращането. Вашата заявка обаче беше записана в системата.");
       setOrderStatus('idle');
     }
   };
 
-  const Scene3D = ({ project }: any) => {
-    const walls = project.walls;
-    const baseFloors = project.floorsData;
+  const handlePrint = () => {
+      window.print();
+  };
+
+  const Scene3D = ({ project, viewFloor }: any) => {
+    // ФИЛТРАЦИЯ ПО ЕТАЖИ
+    const walls = viewFloor === 'all' ? project.walls : project.walls.filter((w: any) => w.floorId === viewFloor);
+    const baseFloors = viewFloor === 'all' ? project.floorsData : project.floorsData.filter((f: any) => f.id === viewFloor);
     
-    const floor1 = walls.filter((w: any) => w.floorId === 1);
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    (floor1.length ? floor1 : walls).forEach((w: any) => {
-        minX = Math.min(minX, w.coords.x1, w.coords.x2);
-        maxX = Math.max(maxX, w.coords.x1, w.coords.x2);
-        minY = Math.min(minY, w.coords.y1, w.coords.y2);
-        maxY = Math.max(maxY, w.coords.y1, w.coords.y2);
+    // НОВО: Изчисляване на центъра на всеки етаж локално (центрира етажите перфектно един над друг)
+    const floorCenters: Record<string, {cx: number, cy: number, ppm: number}> = {};
+    project.floorsData.forEach((fl: any) => {
+        const floorWalls = project.walls.filter((w: any) => w.floorId === fl.id);
+        const extWalls = floorWalls.filter((w:any) => w.type === 'Външна');
+        let fMinX = Infinity, fMaxX = -Infinity, fMinY = Infinity, fMaxY = -Infinity;
+        const targetWalls = extWalls.length > 0 ? extWalls : floorWalls;
+
+        targetWalls.forEach((w: any) => {
+            fMinX = Math.min(fMinX, w.coords.x1, w.coords.x2);
+            fMaxX = Math.max(fMaxX, w.coords.x1, w.coords.x2);
+            fMinY = Math.min(fMinY, w.coords.y1, w.coords.y2);
+            fMaxY = Math.max(fMaxY, w.coords.y1, w.coords.y2);
+        });
+
+        floorCenters[fl.id] = {
+            cx: fMinX === Infinity ? 0 : (fMinX + fMaxX) / 2,
+            cy: fMinY === Infinity ? 0 : (fMinY + fMaxY) / 2,
+            ppm: fl.ppm || 50
+        };
     });
-    const centerX = minX === Infinity ? 0 : (minX + maxX) / 2;
-    const centerY = minY === Infinity ? 0 : (minY + maxY) / 2;
 
     return (
-      <Canvas camera={{ position: [0, 20, 30], fov: 45 }}>
+      <Canvas gl={{ preserveDrawingBuffer: true }} camera={{ position: [0, 20, 30], fov: 45 }} className="print:w-full print:h-[500px]">
         <ambientLight intensity={0.7} />
         <directionalLight position={[10, 30, 10]} intensity={1.5} castShadow />
         <OrbitControls enablePan={true} enableZoom={true} enableRotate={true} />
         
         <group position={[0, -5, 0]}>
             {baseFloors.map((fl: any, idx: number) => {
-                if (fl.walls.length < 3) return null;
+                const floorWalls = project.walls.filter((w: any) => w.floorId === fl.id);
+                if (floorWalls.length === 0) return null;
                 
-                let fMinX = Infinity, fMaxX = -Infinity, fMinY = Infinity, fMaxY = -Infinity;
-                fl.walls.forEach((w: any) => {
-                    fMinX = Math.min(fMinX, w.coords.x1, w.coords.x2); fMaxX = Math.max(fMaxX, w.coords.x1, w.coords.x2);
-                    fMinY = Math.min(fMinY, w.coords.y1, w.coords.y2); fMaxY = Math.max(fMaxY, w.coords.y1, w.coords.y2);
+                // НОВО: Изчисляваме физическия размер на подложката в метри въз основа на центрираните стени
+                let mMinX = Infinity, mMaxX = -Infinity, mMinY = Infinity, mMaxY = -Infinity;
+                const fc = floorCenters[fl.id];
+
+                floorWalls.forEach((w: any) => {
+                    const mX1 = (w.coords.x1 - fc.cx) / fc.ppm;
+                    const mY1 = (w.coords.y1 - fc.cy) / fc.ppm;
+                    const mX2 = (w.coords.x2 - fc.cx) / fc.ppm;
+                    const mY2 = (w.coords.y2 - fc.cy) / fc.ppm;
+                    mMinX = Math.min(mMinX, mX1, mX2);
+                    mMaxX = Math.max(mMaxX, mX1, mX2);
+                    mMinY = Math.min(mMinY, mY1, mY2);
+                    mMaxY = Math.max(mMaxY, mY1, mY2);
                 });
-                
-                const flW = (fMaxX - fMinX) / (fl.ppm || 50);
-                const flD = (fMaxY - fMinY) / (fl.ppm || 50);
-                const cX = ((fMinX + fMaxX) / 2 - centerX) / (fl.ppm || 50);
-                const cZ = ((fMinY + fMaxY) / 2 - centerY) / (fl.ppm || 50);
+
+                const flW = (mMaxX - mMinX) + 1.0;
+                const flD = (mMaxY - mMinY) + 1.0;
+                const cX = (mMinX + mMaxX) / 2;
+                const cZ = (mMinY + mMaxY) / 2;
                 
                 let elev = 0;
-                for(let i=0; i<idx; i++) elev += baseFloors[i].height;
+                const globalIdx = project.floorsData.findIndex((f: any) => f.id === fl.id);
+                for(let i=0; i<globalIdx; i++) elev += Number(project.floorsData[i].height);
 
                 return (
-                    <mesh key={`slab-${fl.id}`} position={[cX, elev, cZ]} rotation={[-Math.PI / 2, 0, 0]}>
-                        <planeGeometry args={[flW + 0.2, flD + 0.2]} />
-                        <meshStandardMaterial color="#cbd5e1" side={THREE.DoubleSide} />
+                    <mesh key={`red-slab-${fl.id}`} position={[cX, elev - 0.05, cZ]} rotation={[-Math.PI / 2, 0, 0]}>
+                        <boxGeometry args={[flW, flD, 0.1]} />
+                        <meshStandardMaterial color="#fee2e2" side={THREE.DoubleSide} />
+                        <Edges scale={1} threshold={15} color="#ef4444" />
                     </mesh>
                 );
             })}
 
             {walls.map((wall: any) => {
-                const ppm = baseFloors.find((f:any) => f.id === wall.floorId)?.ppm || 50;
+                const fc = floorCenters[wall.floorId];
                 const cx = (wall.coords.x1 + wall.coords.x2) / 2;
                 const cy = (wall.coords.y1 + wall.coords.y2) / 2;
-                const posX = (cx - centerX) / ppm;
-                const posZ = (cy - centerY) / ppm;
+                const posX = (cx - fc.cx) / fc.ppm;
+                const posZ = (cy - fc.cy) / fc.ppm;
                 
                 const dx = wall.coords.x2 - wall.coords.x1;
                 const dy = wall.coords.y2 - wall.coords.y1;
@@ -917,7 +1142,7 @@ export default function Calculator() {
                                     const pX = currentX + p.width / 2;
                                     const pY = currentY + r.height / 2;
                                     currentX += p.width;
-                                    let color = wall.type === 'Външна' ? '#e2e8f0' : '#f8fafc'; 
+                                    let color = wall.type === 'Външна' ? '#e2e8f0' : '#cbd5e1'; // По-тъмен цвят за вътрешните стени
                                     if (p.type === 'custom') color = "#ffedd5";
 
                                     return (
@@ -939,348 +1164,379 @@ export default function Calculator() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-50 text-slate-900 font-sans pt-24 pb-20 px-4 relative overflow-hidden flex flex-col">
-      
-      <nav className="fixed top-0 left-0 w-full z-50 bg-white/95 backdrop-blur-md border-b border-gray-100 h-16">
-        <div className="flex items-center justify-between px-6 py-3 max-w-[1800px] mx-auto h-full">
-          <div className="flex items-center gap-8">
-            <Link href="/">
-              <Image src="/logo.png" alt="БИОЗИД" width={100} height={30} priority className="cursor-pointer" />
-            </Link>
-            
-            <div className="hidden md:flex items-center gap-6 text-xs font-bold text-slate-600 uppercase tracking-widest">
-                <Link href="/" className="hover:text-teal-600 transition">Начало</Link>
-                <Link href="/about" className="hover:text-teal-600 transition">За нас</Link>
-                <Link href="/panels" className="hover:text-teal-600 transition">Панели</Link>
-                <Link href="/calculator" className="text-teal-600 border-b-2 border-teal-600 pb-1">Калкулатор</Link>
-                <Link href="/contacts" className="hover:text-teal-600 transition">Контакти</Link>
-            </div>
-          </div>
+    <div className="flex flex-col min-h-screen print:bg-white print:text-black">
+      <div className="print:hidden"><Navbar /></div>
 
-          <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Мерна единица:</span>
-                  <select value={unit} onChange={(e) => setUnit(e.target.value as any)} className="bg-slate-100 text-teal-700 text-xs font-bold p-2 rounded outline-none cursor-pointer border border-slate-200 focus:border-teal-500">
-                      <option value="cm">Сантиметри (cm)</option>
-                      <option value="m">Метри (m)</option>
-                  </select>
-              </div>
-              <button onClick={() => setViewMode(viewMode === '2D' ? '3D' : '2D')} className="bg-slate-900 text-white text-xs font-bold px-6 py-2 rounded uppercase tracking-wider hover:bg-teal-600 transition shadow">
-                  {viewMode === '2D' ? 'Към 3D Модел' : 'Към CAD Чертеж'}
-              </button>
-          </div>
-        </div>
-      </nav>
-
-      <div className="flex flex-1 gap-6 max-w-[1800px] mx-auto w-full h-[calc(100vh-8rem)]">
+      <main className="flex-1 bg-slate-50 text-slate-900 font-sans pt-24 pb-20 px-4 relative overflow-hidden flex flex-col print:p-0 print:m-0 print:bg-white print:overflow-visible">
         
-        {/* ЛЯВ ПАНЕЛ */}
-        <div className="w-80 flex flex-col gap-4 bg-white p-5 rounded-xl shadow-lg border border-slate-200 overflow-y-auto z-20">
-            
-            <Suspense fallback={<div className="text-xs text-slate-400">Зареждане на данни...</div>}>
-               <TemplateInfo />
-            </Suspense>
-
-            {/* ИЗБОР НА ЕТАЖ С ДОБАВЯНЕ */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-end mb-1">
-                 <h3 className="text-[10px] font-bold uppercase text-slate-400">Етаж за чертане</h3>
-                 <button onClick={handleAddFloor} className="text-[10px] font-bold text-teal-600 hover:text-teal-800 uppercase tracking-widest flex items-center gap-1">+ Нов Етаж</button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {floors.map(f => (
-                  <button key={f.id} onClick={() => { setActiveFloorId(f.id); setViewMode('2D'); }} className={`px-3 py-2 text-[10px] font-bold rounded border transition ${activeFloorId === f.id && viewMode === '2D' ? 'bg-teal-600 text-white border-teal-700' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>
-                    {f.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {!uploadedImageUrl ? (
-                <div className="flex flex-col gap-3 pt-4 border-t border-slate-100">
-                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-teal-300 border-dashed rounded cursor-pointer bg-teal-50 hover:bg-teal-100 transition text-center p-4 group">
-                        <span className="text-[10px] text-teal-800 font-bold uppercase">1. Качи подложка за {activeFloor?.name}</span>
-                        <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
-                    </label>
-                    <div className="bg-slate-50 p-3 rounded text-[10px] text-slate-600 leading-relaxed border border-slate-100">
-                        Подложката е основата, върху която трябва да начертаете външните и вътрешните стени. 
-                        Тя служи за мащабиране на вашия проект.
-                        <br /><br />
-                        <strong>Поддържани формати:</strong> .jpg, .png, .pdf (като изображение)
-                    </div>
-                </div>
-            ) : (
-                <>
-                    {/* Контролен панел за нагласяне на подложка (показва се само за етаж 2+) */}
-                    {activeFloorId > 1 && (
-                        <div className="bg-slate-100 p-2 rounded mb-1 border border-slate-200">
-                            <span className="text-[10px] font-bold uppercase text-slate-500 mb-2 block text-center">Подравняване на чертежа</span>
-                            <div className="grid grid-cols-3 gap-1 mb-1 max-w-[150px] mx-auto">
-                                <div></div>
-                                <button onClick={() => adjustBg('y', -10)} className="bg-white rounded shadow text-xs py-1 hover:bg-teal-50">⬆️</button>
-                                <div></div>
-                                <button onClick={() => adjustBg('x', -10)} className="bg-white rounded shadow text-xs py-1 hover:bg-teal-50">⬅️</button>
-                                <button onClick={() => adjustBg('y', 10)} className="bg-white rounded shadow text-xs py-1 hover:bg-teal-50">⬇️</button>
-                                <button onClick={() => adjustBg('x', 10)} className="bg-white rounded shadow text-xs py-1 hover:bg-teal-50">➡️</button>
-                            </div>
-                            <div className="flex gap-1 justify-center max-w-[150px] mx-auto">
-                                <button onClick={() => adjustBg('scale', -0.02)} className="flex-1 bg-white rounded shadow text-xs py-1 font-bold text-slate-500 hover:bg-teal-50">-</button>
-                                <span className="text-[10px] flex items-center px-1 text-slate-400">Мащаб</span>
-                                <button onClick={() => adjustBg('scale', 0.02)} className="flex-1 bg-white rounded shadow text-xs py-1 font-bold text-slate-500 hover:bg-teal-50">+</button>
-                            </div>
-                        </div>
-                    )}
-
-                    {!pixelsPerMeter ? (
-                        <div className="bg-orange-50 border-2 border-orange-400 p-4 rounded-xl shadow-inner">
-                            <strong className="text-orange-900 uppercase tracking-wide text-xs block mb-2">⚠️ Задължително: Калибриране!</strong>
-                            <span className="text-xs text-orange-800 leading-relaxed font-medium">
-                                Изберете "Маркирай ъгъл" и очертайте ъглите <strong className="text-rose-600 text-sm uppercase underline decoration-2 underline-offset-4">последователно в кръг</strong> по контура на сградата.
-                            </span>
-                        </div>
-                    ) : (
-                        <div className="bg-teal-50 border border-teal-200 p-3 rounded text-xs text-teal-800 leading-relaxed shadow-inner">
-                            <strong>Мащабът е зададен!</strong><br/>
-                            Може да продължите с чертането. Можете и да местите ъглите, за да ги нагласите перфектно.
-                        </div>
-                    )}
-
-                    <div className="border-b border-slate-100 pb-4 mt-2">
-                        <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">2. Инструменти за Чертане</h3>
-                        
-                        <div className="flex gap-2 mb-3 bg-slate-100 p-1 rounded">
-                            <button onClick={() => setWallType('Външна')} className={`flex-1 py-1.5 text-[10px] font-bold uppercase rounded transition ${wallType === 'Външна' ? 'bg-white shadow text-teal-700' : 'text-slate-500 hover:text-slate-700'}`}>Външна Стена</button>
-                            <button onClick={() => setWallType('Вътрешна')} className={`flex-1 py-1.5 text-[10px] font-bold uppercase rounded transition ${wallType === 'Вътрешна' ? 'bg-white shadow text-slate-700' : 'text-slate-500 hover:text-slate-700'}`}>Вътрешна Стена</button>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2 mb-2">
-                            <button onClick={() => setDrawingMode(drawingMode === 'point' ? 'none' : 'point')} className={`p-2 text-[10px] font-bold uppercase rounded border transition ${drawingMode === 'point' ? 'bg-rose-500 text-white border-rose-600 shadow-inner' : 'bg-white text-slate-700 hover:bg-rose-50 border-slate-200'}`}>
-                                {drawingMode === 'point' ? 'Спри' : 'Маркирай ъгъл'}
-                            </button>
-                            <button onClick={() => setDrawingMode(drawingMode === 'wall' ? 'none' : 'wall')} className={`p-2 text-[10px] font-bold uppercase rounded border transition ${drawingMode === 'wall' ? 'bg-teal-600 text-white border-teal-700 shadow-inner' : 'bg-white text-slate-700 hover:bg-teal-50 border-slate-200'}`}>
-                                {drawingMode === 'wall' ? 'Спри чертане' : 'Чертай Стена'}
-                            </button>
-                        </div>
-                        
-                        {activeFloor && activeFloor.markedPoints.length >= 3 && (
-                           <button onClick={() => {
-                               if (pixelsPerMeter) handleGenerateWallsOnly();
-                               else setCalibrationModal(true); 
-                           }} className="w-full mt-2 bg-slate-900 text-white p-2 rounded text-[10px] font-bold uppercase hover:bg-teal-600 transition shadow">
-                               {pixelsPerMeter ? 'Очертай автоматично' : `Калибрирай по площ (${activeFloor.markedPoints.length} точки)`}
-                           </button>
-                        )}
-                    </div>
-
-                    <div className="flex-1 flex flex-col min-h-0">
-                        <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Списък Елементи ({getActiveWalls().length})</h3>
-                        <ul className="space-y-2 overflow-y-auto pr-1 flex-1">
-                            {getActiveWalls().map((w: any) => {
-                                const displayLength = unit === 'cm' ? (w.length * 100).toFixed(1) : w.length.toFixed(2);
-                                const displayHeight = unit === 'cm' ? (w.height * 100).toFixed(0) : w.height.toFixed(2);
-                                
-                                return (
-                                    <li key={`list-${w.id}`} className="bg-slate-50 p-2 rounded border border-slate-200 text-xs flex flex-col gap-1 shadow-sm hover:border-teal-300 transition text-slate-800">
-                                        <div className="flex justify-between items-center">
-                                            <span className="font-bold">Стена {w.displayId} <span className="text-[10px] font-normal text-slate-400">({w.type})</span></span>
-                                            
-                                            {editingWallId === w.id ? (
-                                                <div className="flex items-center gap-1">
-                                                    <input 
-                                                        autoFocus
-                                                        value={editValue}
-                                                        onChange={(e) => setEditValue(e.target.value)}
-                                                        className="w-12 p-1 text-right border border-teal-500 rounded text-xs outline-none bg-white font-bold text-teal-800"
-                                                        placeholder="Дължина"
-                                                    />
-                                                    <input 
-                                                        value={editHeightValue}
-                                                        onChange={(e) => setEditHeightValue(e.target.value)}
-                                                        className="w-12 p-1 text-right border border-orange-500 rounded text-xs outline-none bg-white font-bold text-orange-800"
-                                                        placeholder="Височина"
-                                                    />
-                                                    <button onClick={() => handleWallEditSave(w.id)} className="bg-teal-600 text-white px-2 py-1 rounded text-[10px] font-bold">OK</button>
-                                                </div>
-                                            ) : (
-                                                <span 
-                                                    className="font-black text-teal-600 cursor-pointer hover:underline underline-offset-2 decoration-teal-300 px-1 rounded hover:bg-teal-50 transition"
-                                                    onClick={() => { setEditingWallId(w.id); setEditValue(displayLength); setEditHeightValue(displayHeight); }}
-                                                    title="Кликни за редакция на Дължина и Височина"
-                                                >
-                                                    L: {displayLength} / H: {displayHeight} {unit}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    </div>
-
-                    <button onClick={handleCalculateProject} disabled={floors.every(f => f.walls.length === 0)} className={`w-full text-white py-3 mt-2 rounded text-xs font-bold uppercase tracking-widest shadow-lg transition ${floors.every(f => f.walls.length === 0) ? 'bg-slate-300 cursor-not-allowed' : 'bg-teal-600 hover:bg-teal-500'}`}>
-                        Изгради 3D Модел
-                    </button>
-                </>
-            )}
-        </div>
-
-        {/* РАБОТНО ПРОСТРАНСТВО */}
-        <div key={viewMode} className="flex-1 bg-white rounded-xl shadow-lg border border-slate-200 relative overflow-hidden flex flex-col">
-            
-            {viewMode === '2D' && (
-                <div className={`flex-1 bg-slate-100 relative overflow-hidden ${drawingMode !== 'none' ? 'cursor-crosshair' : 'cursor-default'}`}>
-                    
-                    <div className="absolute top-4 right-4 z-40">
-                        {uploadedImageUrl && (
-                             <button 
-                                onClick={handleUndo} 
-                                disabled={actionHistory.length === 0} 
-                                className={`flex items-center gap-2 px-4 py-2 text-[10px] font-bold uppercase tracking-widest rounded transition ${actionHistory.length > 0 ? 'bg-white shadow-lg text-slate-700 hover:bg-slate-900 hover:text-white border border-slate-200' : 'bg-white/50 text-slate-400 cursor-not-allowed border border-transparent'}`}
-                            >
-                                <span>Назад</span>
-                                <span className={`text-[8px] px-1.5 py-0.5 rounded ${actionHistory.length > 0 ? 'bg-slate-100 text-slate-500' : 'bg-transparent text-slate-300'}`}>Ctrl+Z</span>
-                            </button>
-                        )}
-                    </div>
-
-                    <div className="absolute inset-0 z-10 w-full h-full">
-                         <canvas ref={canvasRef} className="w-full h-full" />
-                    </div>
-
-                    {!uploadedImageUrl && (
-                        <div className="absolute inset-0 z-0 flex flex-col items-center justify-center text-slate-400 text-sm font-bold uppercase tracking-widest bg-white">
-                            Качете чертеж от лявото меню, за да започнете проектирането на {activeFloor?.name}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {viewMode === '3D' && (
-                <div className="flex-1 bg-slate-50 flex flex-col relative text-slate-800">
-                    {projectResult ? (
-                        <>
-                            <div className="absolute top-4 left-4 z-10 bg-white/95 backdrop-blur p-5 rounded-xl shadow-xl border border-slate-200 min-w-[300px]">
-                                <h3 className="text-[10px] font-bold uppercase tracking-widest text-teal-600 border-b border-slate-100 pb-3 mb-3">Производствена Спецификация</h3>
-                                <div className="space-y-2 text-xs">
-                                    <div className="flex justify-between"><span className="text-slate-500">Общо цели панели:</span><span className="font-bold">{projectResult.globalStats.aFull + projectResult.globalStats.bFull} бр.</span></div>
-                                    <div className="flex justify-between"><span className="text-slate-500">Къстъм срязове:</span><span className="font-bold text-orange-500">{projectResult.globalStats.custom} бр.</span></div>
-                                    <div className="flex justify-between pt-2 border-t border-slate-100"><span className="text-slate-500">Защипване ъгли:</span><span className="font-bold text-teal-600">Активно (+10см)</span></div>
-                                    <div className="flex justify-between pt-2 mt-2 border-t border-slate-200"><span className="text-slate-600 font-bold uppercase">Обща квадратура:</span><span className="font-black text-teal-600 text-sm">{projectResult.globalStats.totalAreaUsed.toFixed(1)} м²</span></div>
-                                </div>
-                                <button onClick={() => setIsOrderModalOpen(true)} className="w-full mt-5 bg-slate-900 text-white py-3 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-teal-600 transition shadow">Изпрати запитване</button>
-                            </div>
-                            <Scene3D project={projectResult} />
-                        </>
-                    ) : (
-                        <div className="flex-1 flex items-center justify-center text-slate-400 text-sm font-bold uppercase tracking-widest">
-                            Начертайте стени в 2D режим и генерирайте модела
-                        </div>
-                    )}
-                </div>
-            )}
-
-        </div>
-      </div>
-
-      {/* МОДАЛ ЗА КАЛИБРИРАНЕ ЧРЕЗ ПЛОЩ */}
-      {calibrationModal && (
-          <div className="fixed inset-0 z-[600] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in text-slate-800">
-              <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-8 text-center border-t-4 border-teal-500 relative">
-                  <button onClick={() => setCalibrationModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-800 text-xl leading-none">&times;</button>
-                  <h2 className="font-bold text-lg mb-2">Калибриране чрез Площ</h2>
-                  <p className="text-xs text-slate-500 mb-6 font-light">Въведете общата квадратура на маркирания етаж и стандартната му височина.</p>
-                  
-                  <div className="flex flex-col gap-4 mb-6">
-                    <div className="flex flex-col gap-1 text-left">
-                        <label className="text-[10px] font-bold uppercase text-slate-400">Обща площ на етажа (кв.м.)</label>
-                        <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
-                            <input 
-                                type="number" 
-                                value={calibAreaInput} 
-                                onChange={(e) => setCalibAreaInput(e.target.value)} 
-                                placeholder="Напр. 100" 
-                                className="w-full bg-transparent text-lg font-bold outline-none text-right"
-                                autoFocus
-                            />
-                            <span className="font-bold text-teal-600 bg-teal-50 px-3 py-1 rounded text-sm">m²</span>
-                        </div>
-                    </div>
-
-                    <div className="flex flex-col gap-1 text-left">
-                        <label className="text-[10px] font-bold uppercase text-slate-400">Височина на етажа ({unit})</label>
-                        <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
-                            <input 
-                                type="number" 
-                                value={calibHeightInput} 
-                                onChange={(e) => setCalibHeightInput(e.target.value)} 
-                                placeholder="Височина" 
-                                className="w-full bg-transparent text-lg font-bold outline-none text-right"
-                            />
-                            <span className="font-bold text-teal-600 bg-teal-50 px-3 py-1 rounded text-sm">{unit}</span>
-                        </div>
-                    </div>
-                  </div>
-
-                  <button onClick={handleAreaCalibrationSubmit} disabled={!calibAreaInput} className={`w-full text-white p-3 rounded text-xs font-bold uppercase tracking-widest transition shadow ${calibAreaInput ? 'bg-teal-600 hover:bg-slate-900' : 'bg-slate-300 cursor-not-allowed'}`}>
-                      Запази и Авто-генерирай
-                  </button>
-              </div>
+        <div className="block lg:hidden bg-amber-50 border-l-4 border-amber-500 p-4 mb-6 rounded-r-xl shadow-sm print:hidden">
+          <div className="flex items-center gap-3">
+            <span className="text-xl">💡</span>
+            <p className="text-xs text-amber-800 font-medium leading-relaxed">
+              <strong>Внимание:</strong> Този инструмент работи в пълния си потенциал на десктоп версия. За максимална прецизност при чертане, моля, използвайте компютър.
+            </p>
           </div>
-      )}
-      
-      {/* МОДАЛ ЗА ОФЕРТА */}
-      {isOrderModalOpen && (
-        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in text-slate-800">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8">
-              <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
-                  <h2 className="font-bold text-lg">Изпрати запитване</h2>
-                  <button onClick={() => setIsOrderModalOpen(false)} className="text-slate-400 hover:text-slate-800 text-2xl leading-none">&times;</button>
-              </div>
-              <p className="text-xs text-slate-500 mb-6 font-light">Спецификацията и пълният CAD модел ще бъдат изпратени към инженерите за остойностяване.</p>
+        </div>
+
+        <div className="flex flex-col lg:flex-row flex-1 gap-6 max-w-[1800px] mx-auto w-full min-h-[600px] lg:h-[calc(100vh-8rem)] print:h-auto print:block">
+          
+          <div className="w-full lg:w-80 flex flex-col gap-4 bg-white p-5 rounded-xl shadow-lg border border-slate-200 overflow-y-auto z-20 print:hidden">
               
-              <div className="space-y-4 mb-6">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-bold uppercase text-slate-400">Вашето Име</label>
-                  <input 
-                    type="text" 
-                    value={clientName} 
-                    onChange={(e) => setClientName(e.target.value)}
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded text-sm outline-none focus:border-teal-500 transition font-bold"
-                  />
+              <Suspense fallback={<div className="text-xs text-slate-400">Зареждане на данни...</div>}>
+                 <TemplateInfo />
+              </Suspense>
+
+              <div className="space-y-2">
+                <div className="flex justify-between items-end mb-1">
+                    <h3 className="text-[10px] font-bold uppercase text-slate-400">Етаж за чертане</h3>
+                    <button onClick={handleAddFloor} className="text-[10px] font-bold text-teal-600 hover:text-teal-800 uppercase tracking-widest flex items-center gap-1">+ Нов Етаж</button>
                 </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-bold uppercase text-slate-400">Телефон за връзка</label>
-                  <input 
-                    type="tel" 
-                    value={clientPhone}
-                    onChange={(e) => setClientPhone(e.target.value)}
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded text-sm outline-none focus:border-teal-500 transition font-bold"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-bold uppercase text-slate-400">Населено място (Обект)</label>
-                  <input 
-                    type="text" 
-                    value={clientLocation}
-                    onChange={(e) => setClientLocation(e.target.value)}
-                    className="w-full p-3 bg-slate-100 border border-teal-200 rounded text-sm outline-none focus:border-teal-500 transition font-bold text-teal-800"
-                    placeholder="Напр. София"
-                  />
+                <div className="flex flex-wrap gap-2">
+                  {floors.map(f => (
+                    <button key={f.id} onClick={() => { setActiveFloorId(f.id); setViewMode('2D'); }} className={`px-3 py-2 text-[10px] font-bold rounded border transition ${activeFloorId === f.id && viewMode === '2D' ? 'bg-teal-600 text-white border-teal-700' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>
+                      {f.name}
+                    </button>
+                  ))}
                 </div>
               </div>
-              
-              {orderStatus === 'idle' ? (
-                  <button onClick={handleSubmitQuote} className="w-full bg-teal-600 text-white p-3 rounded text-xs font-bold uppercase tracking-widest hover:bg-slate-900 transition shadow-lg">Изпрати</button>
-              ) : orderStatus === 'sending' ? (
-                  <div className="w-full flex justify-center py-3"><div className="w-6 h-6 border-2 border-slate-200 border-t-teal-600 rounded-full animate-spin"></div></div>
-              ) : orderStatus === 'success' ? (
-                  <button className="w-full bg-green-500 text-white p-3 rounded text-xs font-bold uppercase tracking-widest">Успешно изпратено!</button>
+
+              {!uploadedImageUrl ? (
+                  <div className="flex flex-col gap-3 pt-4 border-t border-slate-100">
+                      <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-teal-300 border-dashed rounded cursor-pointer bg-teal-50 hover:bg-teal-100 transition text-center p-4 group">
+                          <span className="text-[10px] text-teal-800 font-bold uppercase">1. Качи подложка за {activeFloor?.name}</span>
+                          <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
+                      </label>
+                      <div className="bg-slate-50 p-3 rounded text-[10px] text-slate-600 leading-relaxed border border-slate-100">
+                          Подложката е основата, върху която трябва да начертаете външните и вътрешните стени. 
+                          Тя служи за мащабиране на вашия проект.
+                      </div>
+                  </div>
               ) : (
-                <button onClick={handleSubmitQuote} className="w-full bg-red-600 text-white p-3 rounded text-xs font-bold uppercase">Грешка. Опитай пак.</button>
+                  <>
+                      {/* НОВИ КОНТРОЛИ ЗА ПОДЛОЖКА С INPUT И +/- БУТОНИ + ЗАДЪРЖАНЕ */}
+                      {activeFloorId > 1 && (
+                          <div className="bg-slate-100 p-3 rounded-xl mb-1 border border-slate-200">
+                              <span className="text-[10px] font-bold uppercase text-slate-500 mb-3 block text-center border-b border-slate-200 pb-2">🖱️ Напасване на подложката</span>
+                              <div className="flex flex-col gap-2 mb-3">
+                                  <div className="flex items-center justify-between gap-1">
+                                      <span className="text-[10px] font-bold text-slate-500 w-16 leading-tight">Ширина (Scale X)</span>
+                                      <button onPointerDown={() => startAdjust('scaleX', -0.005)} onPointerUp={stopAdjust} onPointerLeave={stopAdjust} className="w-6 h-6 bg-white border border-slate-200 rounded text-xs font-bold hover:bg-slate-50 select-none">-</button>
+                                      <input type="number" step="0.005" value={activeFloor.bgScaleX || 1} onChange={(e) => setBgDirectly('scaleX', parseFloat(e.target.value) - (activeFloor.bgScaleX || 1))} className="w-14 text-[10px] font-bold p-1 text-center border border-slate-200 rounded outline-none" />
+                                      <button onPointerDown={() => startAdjust('scaleX', 0.005)} onPointerUp={stopAdjust} onPointerLeave={stopAdjust} className="w-6 h-6 bg-white border border-slate-200 rounded text-xs font-bold hover:bg-slate-50 select-none">+</button>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-1">
+                                      <span className="text-[10px] font-bold text-slate-500 w-16 leading-tight">Височина (Scale Y)</span>
+                                      <button onPointerDown={() => startAdjust('scaleY', -0.005)} onPointerUp={stopAdjust} onPointerLeave={stopAdjust} className="w-6 h-6 bg-white border border-slate-200 rounded text-xs font-bold hover:bg-slate-50 select-none">-</button>
+                                      <input type="number" step="0.005" value={activeFloor.bgScaleY || 1} onChange={(e) => setBgDirectly('scaleY', parseFloat(e.target.value) - (activeFloor.bgScaleY || 1))} className="w-14 text-[10px] font-bold p-1 text-center border border-slate-200 rounded outline-none" />
+                                      <button onPointerDown={() => startAdjust('scaleY', 0.005)} onPointerUp={stopAdjust} onPointerLeave={stopAdjust} className="w-6 h-6 bg-white border border-slate-200 rounded text-xs font-bold hover:bg-slate-50 select-none">+</button>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-1">
+                                      <span className="text-[10px] font-bold text-slate-500 w-16 leading-tight">Хоризонтално (Ляво/Дясно)</span>
+                                      <button onPointerDown={() => startAdjust('x', -2)} onPointerUp={stopAdjust} onPointerLeave={stopAdjust} className="w-6 h-6 bg-white border border-slate-200 rounded text-xs font-bold hover:bg-slate-50 select-none">-</button>
+                                      <input type="number" value={activeFloor.bgOffsetX || 0} onChange={(e) => setBgDirectly('x', parseFloat(e.target.value) - (activeFloor.bgOffsetX || 0))} className="w-14 text-[10px] font-bold p-1 text-center border border-slate-200 rounded outline-none" />
+                                      <button onPointerDown={() => startAdjust('x', 2)} onPointerUp={stopAdjust} onPointerLeave={stopAdjust} className="w-6 h-6 bg-white border border-slate-200 rounded text-xs font-bold hover:bg-slate-50 select-none">+</button>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-1">
+                                      <span className="text-[10px] font-bold text-slate-500 w-16 leading-tight">Вертикално (Горе/Долу)</span>
+                                      <button onPointerDown={() => startAdjust('y', -2)} onPointerUp={stopAdjust} onPointerLeave={stopAdjust} className="w-6 h-6 bg-white border border-slate-200 rounded text-xs font-bold hover:bg-slate-50 select-none">-</button>
+                                      <input type="number" value={activeFloor.bgOffsetY || 0} onChange={(e) => setBgDirectly('y', parseFloat(e.target.value) - (activeFloor.bgOffsetY || 0))} className="w-14 text-[10px] font-bold p-1 text-center border border-slate-200 rounded outline-none" />
+                                      <button onPointerDown={() => startAdjust('y', 2)} onPointerUp={stopAdjust} onPointerLeave={stopAdjust} className="w-6 h-6 bg-white border border-slate-200 rounded text-xs font-bold hover:bg-slate-50 select-none">+</button>
+                                  </div>
+                              </div>
+                              <button onClick={() => setDrawingMode(drawingMode === 'move-bg' ? 'none' : 'move-bg')} className={`w-full p-2 text-[10px] font-bold uppercase rounded border transition shadow-sm ${drawingMode === 'move-bg' ? 'bg-amber-500 text-white border-amber-600' : 'bg-white text-slate-700 hover:bg-amber-50 border-slate-200'}`}>
+                                  {drawingMode === 'move-bg' ? 'Приключи местенето' : 'Наместване с мишка'}
+                              </button>
+                          </div>
+                      )}
+
+                      {!pixelsPerMeter ? (
+                          <div className="bg-orange-50 border-2 border-orange-400 p-4 rounded-xl shadow-inner mt-2">
+                              <strong className="text-orange-900 uppercase tracking-wide text-xs block mb-2"> Ръководство за калибриране:</strong>
+                              <ol className="list-decimal pl-4 text-xs text-orange-800 leading-relaxed font-medium space-y-1">
+                                  <li>Натиснете бутона <strong>"Маркирай ъгъл"</strong>.</li>
+                                  <li>Кликнете върху първия ъгъл на сградата.</li>
+                                  <li>Кликнете върху втория ъгъл (първата начертана линия ще светне в <strong>червено</strong>). Предварително трябва да знаете точния размер на тази стена!</li>
+                                  <li>Продължете да маркирате останалите ъгли по контура.</li>
+                                  <li>След като маркирате всички ъгли, натиснете <strong>"Калибрирай мащаба"</strong> и въведете дължината на червената стена.</li>
+                              </ol>
+                          </div>
+                      ) : (
+                          <div className="bg-teal-50 border border-teal-200 p-3 rounded text-xs text-teal-800 leading-relaxed shadow-inner mt-2">
+                              <strong>Мащабът е зададен!</strong><br/>
+                              Може да продължите с чертането.
+                          </div>
+                      )}
+
+                      <div className="border-b border-slate-100 pb-4 mt-2">
+                          <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-3">2. Инструменти за Чертане</h3>
+                          
+                          <div className="flex gap-2 mb-3 bg-slate-100 p-1 rounded">
+                              <button onClick={() => setWallType('Външна')} className={`flex-1 py-1.5 text-[10px] font-bold uppercase rounded transition ${wallType === 'Външна' ? 'bg-white shadow text-teal-700' : 'text-slate-500 hover:text-slate-700'}`}>Външна</button>
+                              <button onClick={() => setWallType('Вътрешна')} className={`flex-1 py-1.5 text-[10px] font-bold uppercase rounded transition ${wallType === 'Вътрешна' ? 'bg-white shadow text-slate-700' : 'text-slate-500 hover:text-slate-700'}`}>Вътрешна</button>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 mb-2">
+                              <button onClick={() => setDrawingMode(drawingMode === 'point' ? 'none' : 'point')} className={`p-2 text-[10px] font-bold uppercase rounded border transition ${drawingMode === 'point' ? 'bg-rose-500 text-white border-rose-600 shadow-inner' : 'bg-white text-slate-700 hover:bg-rose-50 border-slate-200'}`}>
+                                  {drawingMode === 'point' ? 'Спри' : 'Маркирай ъгъл'}
+                              </button>
+                              <button onClick={() => setDrawingMode(drawingMode === 'wall' ? 'none' : 'wall')} className={`p-2 text-[10px] font-bold uppercase rounded border transition ${drawingMode === 'wall' ? 'bg-teal-600 text-white border-teal-700 shadow-inner' : 'bg-white text-slate-700 hover:bg-teal-50 border-slate-200'}`}>
+                                  {drawingMode === 'wall' ? 'Спри' : 'Чертай Стена'}
+                              </button>
+                          </div>
+
+                          {/* ИНФОРМАЦИОННО СЪОБЩЕНИЕ ЗА ВРАТИ И ПРОЗОРЦИ */}
+                          <div className="bg-blue-50 border border-blue-200 p-2 mt-2 rounded text-[10px] text-blue-800 leading-relaxed shadow-sm">
+                              <strong>Важно:</strong> При чертане по подложката, в зоните с прозорци и врати, моля начертайте стените <strong>цялостно и без прекъсване</strong>. Това е нужно за правилно изчисление.
+                          </div>
+                          
+                          {activeFloor && activeFloor.markedPoints.length >= 2 && (
+                             <button onClick={() => {
+                                 if (pixelsPerMeter) handleGenerateWallsOnly();
+                                 else openCalibrationModal(); 
+                             }} className="w-full mt-2 bg-slate-900 text-white p-2 rounded text-[10px] font-bold uppercase hover:bg-teal-600 transition shadow">
+                                 {pixelsPerMeter ? 'Очертай автоматично' : `Калибрирай мащаба`}
+                             </button>
+                          )}
+                      </div>
+
+                      <div className="flex-1 flex flex-col min-h-0">
+                          <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Списък Елементи ({getActiveWalls().length})</h3>
+                          <ul className="space-y-2 overflow-y-auto pr-1 flex-1">
+                              {getActiveWalls().map((w: any) => {
+                                  const displayLength = unit === 'cm' ? (w.length * 100).toFixed(1) : w.length.toFixed(2);
+                                  const displayHeight = unit === 'cm' ? (w.height * 100).toFixed(0) : w.height.toFixed(2);
+                                  
+                                  return (
+                                      <li key={`list-${w.id}`} className="bg-slate-50 p-2 rounded border border-slate-200 text-xs flex flex-col gap-1 shadow-sm hover:border-teal-300 transition text-slate-800">
+                                          <div className="flex justify-between items-center">
+                                              <span className="font-bold">Стена {w.displayId} {w.type === 'Вътрешна' && '(Вътр)'}</span>
+                                              
+                                              {editingWallId === w.id ? (
+                                                  <div className="flex items-center gap-1">
+                                                      <input autoFocus value={editValue} onChange={(e) => setEditValue(e.target.value)} className="w-10 p-1 text-right border border-teal-500 rounded text-[10px]" />
+                                                      <button onClick={() => handleWallEditSave(w.id)} className="bg-teal-600 text-white px-1 py-1 rounded text-[10px]">OK</button>
+                                                  </div>
+                                              ) : (
+                                                  <span className="font-black text-teal-600 cursor-pointer text-[10px]" onClick={() => { setEditingWallId(w.id); setEditValue(displayLength); setEditHeightValue(displayHeight); }}>
+                                                      L: {displayLength} {unit}
+                                                  </span>
+                                              )}
+                                          </div>
+                                      </li>
+                                  );
+                              })}
+                          </ul>
+                      </div>
+
+                      <button onClick={handleCalculateProject} disabled={floors.every(f => f.walls.length === 0)} className={`w-full text-white py-3 mt-2 rounded text-xs font-bold uppercase tracking-widest shadow-lg transition ${floors.every(f => f.walls.length === 0) ? 'bg-slate-300 cursor-not-allowed' : 'bg-teal-600 hover:bg-teal-500'}`}>
+                          Изгради 3D Модел
+                      </button>
+                  </>
+              )}
+          </div>
+
+          <div key={viewMode} className="flex-1 bg-white rounded-xl shadow-lg border border-slate-200 relative overflow-hidden flex flex-col min-h-[400px] print:shadow-none print:border-none print:min-h-[auto] print:overflow-visible">
+              
+              {viewMode === '2D' && (
+                  <div className={`flex-1 bg-slate-100 relative overflow-hidden transition-colors print:hidden ${
+                      drawingMode === 'move-bg' ? 'cursor-grab active:cursor-grabbing border-4 border-amber-400' : 
+                      drawingMode !== 'none' ? 'cursor-crosshair' : 'cursor-default'
+                  }`}>
+                      <div className="absolute top-4 right-4 z-40">
+                          {uploadedImageUrl && (
+                               <button onClick={handleUndo} disabled={actionHistory.length === 0} className={`flex items-center gap-2 px-4 py-2 text-[10px] font-bold uppercase tracking-widest rounded transition ${actionHistory.length > 0 ? 'bg-white shadow-lg text-slate-700 hover:bg-slate-900 hover:text-white border border-slate-200' : 'bg-white/50 text-slate-400 cursor-not-allowed border border-transparent'}`}>
+                                  <span>Назад</span>
+                               </button>
+                          )}
+                      </div>
+                      <div className="absolute inset-0 z-10 w-full h-full">
+                           <canvas ref={canvasRef} className="w-full h-full" />
+                      </div>
+                      {!uploadedImageUrl && (
+                          <div className="absolute inset-0 z-0 flex flex-col items-center justify-center text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em] bg-white text-center px-8 leading-relaxed">
+                              Качете чертеж за {activeFloor?.name}, за да започнете
+                          </div>
+                      )}
+                  </div>
+              )}
+
+              {viewMode === '3D' && (
+                  <div className="flex-1 bg-slate-50 flex flex-col relative text-slate-800 print:bg-white print:overflow-visible overflow-y-auto">
+                      {projectResult ? (
+                          <>
+                              {/* ГОРНА ЛЕНТА С БУТОНИ */}
+                              <div className="sticky top-0 z-30 flex flex-wrap gap-4 justify-between items-center bg-white/95 backdrop-blur p-4 border-b border-slate-200 print:hidden">
+                                  <button onClick={() => setViewMode('2D')} className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded text-xs font-bold uppercase tracking-widest hover:bg-slate-700 transition shadow">
+                                       Върни се към чертане (2D)
+                                  </button>
+                                  <button onClick={handlePrint} className="flex items-center gap-2 px-6 py-2 text-xs font-bold bg-teal-600 text-white rounded hover:bg-teal-500 transition shadow">
+                                      🖨️ Печат на заявка / спецификация
+                                  </button>
+                              </div>
+
+                              {/* ПОТРЕБИТЕЛСКИ ИЗГЛЕД - ЦЯЛАТА СГРАДА */}
+                              <div className="relative h-[450px] border-b border-slate-200 print:hidden shrink-0">
+                                  <div className="absolute top-4 left-4 z-10 bg-white/95 backdrop-blur p-5 rounded-xl shadow-xl border border-slate-200 min-w-[260px]">
+                                      <h3 className="text-[10px] font-bold uppercase tracking-widest text-teal-600 border-b border-slate-100 pb-3 mb-3">Обща Спецификация (Всички етажи)</h3>
+                                      <div className="space-y-2 text-xs">
+                                          <div className="flex justify-between"><span className="text-slate-500">Панели общо:</span><span className="font-bold">{projectResult.globalStats.aFull + projectResult.globalStats.bFull} бр.</span></div>
+                                          <div className="flex justify-between pt-2 border-t border-slate-200"><span className="text-slate-600 font-bold uppercase text-[10px]">Обща Квадратура:</span><span className="font-black text-teal-600 text-sm">{projectResult.globalStats.totalAreaUsed.toFixed(1)} м²</span></div>
+                                      </div>
+                                      <button onClick={() => setIsOrderModalOpen(true)} className="w-full mt-5 bg-slate-900 text-white py-3 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-teal-600 transition shadow">Изпрати запитване</button>
+                                  </div>
+                                  <Scene3D project={projectResult} viewFloor={'all'} />
+                              </div>
+
+                              {/* СКРИТ БЛОК ЗА ПЕЧАТ (PRINT ONLY) - ПЪЛНА ПРОИЗВОДСТВЕНА СПЕЦИФИКАЦИЯ */}
+                              <div className="hidden print:block w-full text-black mt-8">
+                                  <h1 className="text-3xl font-bold mb-6 text-center border-b-4 border-black pb-4">ОФИЦИАЛНА ПРОИЗВОДСТВЕНА СПЕЦИФИКАЦИЯ БИОЗИД</h1>
+                                  <div className="mb-8 text-lg">
+                                      <p><strong>Общо панели за целия проект:</strong> {projectResult.globalStats.aFull + projectResult.globalStats.bFull} бр.</p>
+                                      <p><strong>Обща квадратура на панелите:</strong> {projectResult.globalStats.totalAreaUsed.toFixed(2)} м²</p>
+                                  </div>
+                                  
+                                  {projectResult.floorsData.map((f: any) => {
+                                      const floorWalls = projectResult.walls.filter((w: any) => w.floorId === f.id);
+                                      if (floorWalls.length === 0) return null;
+                                      
+                                      let floorPanelsA = 0;
+                                      let floorPanelsB = 0;
+                                      let floorArea = 0;
+                                      floorWalls.forEach((w:any) => {
+                                          if (w.stats) {
+                                              floorPanelsA += (w.stats.aFull || 0);
+                                              floorPanelsB += (w.stats.bFull || 0);
+                                              floorArea += w.stats.totalAreaUsed || 0;
+                                          }
+                                      });
+
+                                      return (
+                                          <div key={`print-floor-${f.id}`} className="mb-12 break-inside-avoid">
+                                              <h2 className="text-2xl font-bold mb-4 bg-slate-200 p-3 border border-black">{f.name}</h2>
+                                              
+                                              {/* 3D МОДЕЛ В ПРИНТ БЛОКА */}
+                                              <div className="mb-6 border border-black p-2 h-[400px] relative w-full break-inside-avoid">
+                                                  <p className="text-[12px] font-bold mb-2 uppercase absolute top-2 left-2 z-10 bg-white/80 p-1">3D Модел:</p>
+                                                  <Scene3D project={projectResult} viewFloor={f.id} />
+                                              </div>
+
+                                              <div className="flex gap-4 mb-4 break-inside-avoid">
+                                                  {f.underlay && (
+                                                      <div className="w-1/2 border border-black p-2">
+                                                          <p className="text-[12px] font-bold mb-2 uppercase">Оригинална подложка (чертеж):</p>
+                                                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                          <img src={f.underlay} alt={f.name} className="w-full h-auto object-contain max-h-[400px]" />
+                                                      </div>
+                                                  )}
+                                                  <div className="flex-1 border border-black p-6 text-base bg-slate-50">
+                                                      <p className="mb-2"><strong>Брой стени:</strong> {floorWalls.length}</p>
+                                                      <p className="mb-2"><strong>Панели Тип А (2.50x1.25):</strong> {floorPanelsA} бр.</p>
+                                                      <p className="mb-2"><strong>Панели Тип Б (2.44x1.44):</strong> {floorPanelsB} бр.</p>
+                                                      <p className="mb-2 border-t border-slate-300 pt-2"><strong>Площ панели за етажа:</strong> {floorArea.toFixed(2)} м²</p>
+                                                  </div>
+                                              </div>
+                                              
+                                              <table className="w-full text-left border-collapse border border-black text-sm break-inside-avoid">
+                                                  <thead>
+                                                      <tr className="bg-slate-100">
+                                                          <th className="border border-black p-2">Стена (ИД)</th>
+                                                          <th className="border border-black p-2">Тип</th>
+                                                          <th className="border border-black p-2">Дължина (м)</th>
+                                                          <th className="border border-black p-2">Височина (м)</th>
+                                                          <th className="border border-black p-2">Разбивка панели</th>
+                                                      </tr>
+                                                  </thead>
+                                                  <tbody>
+                                                      {floorWalls.map((w: any) => (
+                                                          <tr key={`print-wall-${w.id}`}>
+                                                              <td className="border border-black p-2 font-bold text-center">{w.letter}</td>
+                                                              <td className="border border-black p-2">{w.type}</td>
+                                                              <td className="border border-black p-2 text-center">{w.length.toFixed(2)}</td>
+                                                              <td className="border border-black p-2 text-center">{w.height.toFixed(2)}</td>
+                                                              <td className="border border-black p-2">
+                                                                  {w.stats && `Тип А: ${w.stats.aFull} бр. | Тип Б: ${w.stats.bFull} бр. | Изрязани: ${w.stats.custom} бр.`}
+                                                              </td>
+                                                          </tr>
+                                                      ))}
+                                                  </tbody>
+                                              </table>
+                                          </div>
+                                      );
+                                  })}
+                              </div>
+                          </>
+                      ) : (
+                          <div className="flex-1 flex items-center justify-center text-slate-400 text-xs font-bold uppercase tracking-widest print:hidden">
+                              Генерирайте модела
+                          </div>
+                      )}
+                  </div>
               )}
           </div>
         </div>
+      </main>
+
+      <div className="print:hidden"><Footer /></div>
+
+      {calibrationModal && (
+          <div className="fixed inset-0 z-[600] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 text-slate-800 print:hidden">
+              <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-8 text-center border-t-4 border-teal-500 relative">
+                  <button onClick={() => setCalibrationModal(false)} className="absolute top-4 right-4 text-slate-400 text-xl leading-none">&times;</button>
+                  <h2 className="font-bold text-lg mb-2">Калибриране</h2>
+                  <p className="text-[10px] text-slate-500 mb-4 bg-red-50 p-2 rounded border border-red-100">
+                      Начертаната първа линия в момента е оцветена в <span className="text-red-500 font-bold">ЧЕРВЕНО</span>. Моля, въведете нейната реална дължина:
+                  </p>
+                  <div className="flex flex-col gap-4 mb-6">
+                    <div className="flex flex-col gap-1 text-left">
+                        <label className="text-[10px] font-bold uppercase text-slate-400">Дължина на червената линия ({unit})</label>
+                        <input type="number" value={calibLengthInput} onChange={(e) => setCalibLengthInput(e.target.value)} className="w-full bg-slate-50 p-3 rounded-lg border border-slate-200 font-bold outline-none" />
+                    </div>
+                    <div className="flex flex-col gap-1 text-left">
+                        <label className="text-[10px] font-bold uppercase text-slate-400">Височина на етажа ({unit})</label>
+                        <input type="number" value={calibHeightInput} onChange={(e) => setCalibHeightInput(e.target.value)} className="w-full bg-slate-50 p-3 rounded-lg border border-slate-200 font-bold outline-none" />
+                    </div>
+                    <div className="flex flex-col gap-1 text-left opacity-60">
+                        <label className="text-[10px] font-bold uppercase text-slate-400">Обща площ (m²) - Информативно</label>
+                        <input type="number" value={calibAreaInput} onChange={(e) => setCalibAreaInput(e.target.value)} placeholder="По желание" className="w-full bg-slate-50 p-3 rounded-lg border border-slate-200 font-bold outline-none" />
+                    </div>
+                  </div>
+                  <button onClick={handleAreaCalibrationSubmit} className="w-full bg-teal-600 text-white p-3 rounded text-[10px] font-bold uppercase hover:bg-teal-700 transition shadow">Приложи мащаба</button>
+              </div>
+          </div>
       )}
-    </main>
+      
+      {isOrderModalOpen && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 text-slate-800 print:hidden">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8">
+              <div className="flex justify-between items-center mb-6">
+                  <h2 className="font-bold text-lg">Изпрати запитване</h2>
+                  <button onClick={() => setIsOrderModalOpen(false)} className="text-slate-400 text-2xl leading-none">&times;</button>
+              </div>
+              <div className="space-y-4 mb-6">
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-slate-400">Име</label>
+                  <input value={clientName} onChange={(e) => setClientName(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded text-sm font-bold outline-none" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-slate-400">Имейл</label>
+                  <input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} placeholder="vashiat@email.com" className="w-full p-3 bg-slate-50 border border-slate-200 rounded text-sm font-bold outline-none" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-slate-400">Телефон</label>
+                  <input value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded text-sm font-bold outline-none" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-slate-400">Място</label>
+                  <input value={clientLocation} onChange={(e) => setClientLocation(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded text-sm font-bold outline-none" />
+                </div>
+              </div>
+              
+              <button onClick={handleSubmitQuote} disabled={orderStatus !== 'idle'} className={`w-full p-3 rounded text-[10px] font-bold uppercase shadow-lg transition-colors ${orderStatus === 'success' ? 'bg-green-400 text-black' : 'bg-teal-600 text-white disabled:bg-slate-300'}`}>
+                {orderStatus === 'sending' ? 'Изпращане...' : orderStatus === 'success' ? 'Успешно!' : 'Изпрати'}
+              </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

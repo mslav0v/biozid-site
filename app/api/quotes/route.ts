@@ -12,6 +12,10 @@ export async function POST(request: Request) {
         totalArea: parseFloat(body.totalArea),
         underlayUrl: body.underlayUrl || null,
         cadData: body.cadData, // Prisma директно приема JSON обекти тук
+        
+        // --- НОВО: ЗАПАЗВАМЕ И ДАННИТЕ ЗА ЕТАЖИТЕ ---
+        floorsData: body.floorsData || null, 
+        
         status: 'new'
       },
     });

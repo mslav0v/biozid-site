@@ -21,7 +21,8 @@ model House {
   terraces         Int      @default(0) // Тераси
   price            String   // Цена (съхраняваме я като чист низ "250000")
   description      String?  @db.Text
-  imageUrl         String?  // Път към снимката
+  imageUrl         String?  // Път към главната снимка
+  gallery          String[] // Галерия от допълнителни снимки
   tags             String[] // Тагове (напр. ["Енергоефективна", "Премиум"])
 
   // ТЕХНИЧЕСКИ ХАРАКТЕРИСТИКИ
@@ -33,7 +34,8 @@ model House {
   windowsType      String?  // Вид дограма (напр. "7-камерна PVC, троен стъклопакет")
 
   createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  // ЗАЩИТА: Добавяме default(now()), за да не гърми при съществуващи записи
+  updatedAt        DateTime @default(now()) @updatedAt
 }
 
 // Модел за Клиентските заявки от Калкулатора
@@ -45,6 +47,11 @@ model QuoteRequest {
   status        String   @default("new") // new, in_progress, completed
   underlayUrl   String?  // Линк към качената подложка (чертеж)
   cadData       Json?    // Тук пазим целия масив със стени и панели за CAD редактора
+  
+  // --- НОВО: ПОЛЕ ЗА СЛУЖЕБНИЯ ПАНЕЛ (ЕТАЖИ И ПОДЛОЖКИ) ---
+  floorsData    Json?    // Тук пазим масива с етажите, ppm мащаба и специфичните подложки за всеки етаж
+  
   createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  // ЗАЩИТА: Добавяме default(now()), за да не гърми при съществуващи записи
+  updatedAt     DateTime @default(now()) @updatedAt
 }
