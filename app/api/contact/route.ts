@@ -11,12 +11,12 @@ export async function POST(request: Request) {
     const message = formData.get('message') as string;
     const file = formData.get('file') as File | null;
 
-    // ОДИТ: Добавяме стриктни тайм-аути. Ако сървърът не отговори до 10 сек, 
-    // функцията ще върне грешка веднага, вместо да чака 30 сек и да гръмне с Timeout.
+    // ОДИТ: Преминаваме към ПОРТ 465 (SSL). 
+    // Това е най-стриктният и сигурен метод за връзка със сървъра edison.
     const transporter = nodemailer.createTransport({
       host: process.env.EMAIL_HOST,
-      port: 587, 
-      secure: false, 
+      port: 465, 
+      secure: true, // Задължително true за порт 465
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
@@ -33,12 +33,12 @@ export async function POST(request: Request) {
     // Ако тук има проблем, ще го видим в лога веднага.
     try {
       await transporter.verify();
-      console.log("SMTP Connection verified successfully");
+      console.log("SMTP Connection verified successfully on port 465");
     } catch (verifyError: any) {
       console.error("SMTP Verify Error:", verifyError.message);
       return NextResponse.json({ 
         success: false, 
-        error: `Сървърът edison отказа връзка: ${verifyError.message}` 
+        error: `Сървърът edison отказа връзка на порт 465: ${verifyError.message}` 
       }, { status: 500 });
     }
 
@@ -90,7 +90,6 @@ export async function POST(request: Request) {
     };
 
     // ОДИТ: Използваме Promise.all, за да пратим двата имейла едновременно.
-    // Това пести време и намалява шанса за Timeout във Vercel.
     await Promise.all([
       transporter.sendMail(mailOptions),
       transporter.sendMail(autoReplyOptions)
