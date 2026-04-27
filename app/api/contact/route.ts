@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     // 1. ИМЕЙЛ КЪМ АДМИНИСТРАТОРА (БИОЗИД)
     // КОРЕКЦИЯ: Използваме "replyTo" вместо "reply_to", за да мине проверката на TypeScript
     const adminEmailTask = resend.emails.send({
-      from: 'Biozid Calculator <onboarding@resend.dev>',
+      from: 'Biozid Calculator <office@biozid.bg>',
       to: 'office@biozid.bg', 
       replyTo: email, 
       subject: `Ново запитване от калкулатора: ${name}`,
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
 
     // 2. АВТОМАТИЧЕН ОТГОВОР КЪМ КЛИЕНТА
     const autoReplyTask = resend.emails.send({
-      from: 'БИОЗИД <onboarding@resend.dev>',
+      from: 'БИОЗИД <office@biozid.bg>',
       to: email, 
       subject: `Благодарим Ви за запитването, ${name}!`,
       html: `
