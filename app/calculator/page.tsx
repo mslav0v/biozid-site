@@ -27,6 +27,9 @@ const PANEL_TYPES = [
   { id: 'P6', name: '0.61м x 1.44м', w: 0.61, h: 1.44 },
 ];
 
+const PANEL_A = PANEL_TYPES[0]; 
+const PANEL_B = PANEL_TYPES[1]; 
+
 const getWallLetter = (index: number) => String.fromCharCode(65 + index);
 const generateUniqueId = () => Math.random().toString(36).substring(2, 9);
 
@@ -85,7 +88,6 @@ export default function Calculator() {
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [orderStatus, setOrderStatus] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
 
-  // Филтър за 3D сцената и печат
   const [filter3DFloor, setFilter3DFloor] = useState<number | 'all'>('all');
 
   const stateRefs = useRef({
@@ -175,7 +177,6 @@ export default function Calculator() {
     }
   }, [activeFloor?.underlay, activeFloor?.bgOffsetX, activeFloor?.bgOffsetY, activeFloor?.bgScaleX, activeFloor?.bgScaleY, viewMode, updateCanvasBackground]);
 
-  // ДИРЕКТНО И ПРЕЦИЗНО ЗАДАВАНЕ НА СТОЙНОСТИ ОТ ИНПУТИ И БУТОНИ (ВКЛЮЧИТЕЛНО ЗАДЪРЖАНЕ)
   const setBgDirectly = (type: 'x' | 'y' | 'scaleX' | 'scaleY', valDelta: number) => {
       setFloors(prev => prev.map(f => {
           if (f.id === activeFloorId) {
@@ -191,10 +192,10 @@ export default function Calculator() {
   };
 
   const startAdjust = (type: 'x' | 'y' | 'scaleX' | 'scaleY', valDelta: number) => {
-      setBgDirectly(type, valDelta); // Първоначално натискане
+      setBgDirectly(type, valDelta);
       adjustIntervalRef.current = setInterval(() => {
           setBgDirectly(type, valDelta);
-      }, 50); // Бързина на автоматичното коригиране при задържане
+      }, 50);
   };
 
   const stopAdjust = () => {
@@ -233,7 +234,6 @@ export default function Calculator() {
       
       if (points.length > 1) {
           for (let i = 1; i < points.length; i++) {
-              // При режим калибриране, първата линия се оцветява в червено за визуален ориентир
               const isFirstLine = i === 1 && isCalibratingState;
               const lineStroke = isFirstLine ? '#ef4444' : 'rgba(244, 63, 94, 0.6)';
               const strokeW = isFirstLine ? 4 : 2;
@@ -308,7 +308,6 @@ export default function Calculator() {
 
       const canvas = fabricCanvas.current;
 
-      // ВЪЗСТАНОВЯВАНЕ НА ПОДЛОЖКАТА ПРИ ПРЕЗАРЕЖДАНЕ НА КАНВАСА (ФИКС ЗА ИЗЧЕЗВАЩАТА ПОДЛОЖКА)
       const currentBgFloor = stateRefs.current.floors[stateRefs.current.activeFloorIndex];
       if (currentBgFloor && currentBgFloor.underlay) {
           updateCanvasBackground(currentBgFloor.underlay, currentBgFloor.bgOffsetX, currentBgFloor.bgOffsetY, currentBgFloor.bgScaleX, currentBgFloor.bgScaleY);
@@ -332,7 +331,6 @@ export default function Calculator() {
           const activeIdx = stateRefs.current.activeFloorIndex;
           const floorsToCheck = [];
           if (stateRefs.current.floors[activeIdx]) floorsToCheck.push(stateRefs.current.floors[activeIdx]);
-          // Проверяваме и предишния етаж за ghosting, избягвайки циклене по всички етажи
           if (activeIdx > 0 && stateRefs.current.floors[activeIdx - 1]) floorsToCheck.push(stateRefs.current.floors[activeIdx - 1]);
 
           floorsToCheck.forEach(f => {
@@ -395,7 +393,6 @@ export default function Calculator() {
         
         let isSecondFloorOrAbove = stateRefs.current.activeFloorId > stateRefs.current.floors[0].id;
         
-        // Лилав цвят за калибриращата линия
         let strokeColor = stateRefs.current.drawingMode === 'calibrate' ? '#8b5cf6' : 
             (stateRefs.current.wallType === 'Външна' ? (isSecondFloorOrAbove ? '#3b82f6' : '#0d9488') : '#64748b'); 
         
@@ -524,18 +521,14 @@ export default function Calculator() {
 
       const currentFloorData = stateRefs.current.floors[stateRefs.current.activeFloorIndex];
       if (currentFloorData) {
-        
-        // GHOSTING от предния етаж
         const prevFloor = stateRefs.current.floors.find(f => f.id === currentFloorData.id - 1);
         if (prevFloor) {
-            // Сенки на стените (в жълто, малко по-дебели от червения контур)
             prevFloor.walls.forEach((w: any) => {
                 const line = new fabric.Line([w.coords.x1, w.coords.y1, w.coords.x2, w.coords.y2], {
                     strokeWidth: 4, stroke: '#facc15', strokeDashArray: [6, 6], opacity: 0.8, selectable: false, evented: false
                 });
                 canvas.add(line);
             });
-            // Сенки на точките (светло синьо)
             if (prevFloor.markedPoints && prevFloor.markedPoints.length > 0) {
                  prevFloor.markedPoints.forEach((p: any) => {
                      const circle = new fabric.Circle({ 
@@ -653,7 +646,7 @@ export default function Calculator() {
   const openCalibrationModal = () => {
       setCalibrationModal(true);
       if (fabricCanvas.current && activeFloor && activeFloor.markedPoints.length >= 2) {
-          redrawGuideLines(fabricCanvas.current, activeFloor.markedPoints, true); // True за оцветяване в червено
+          redrawGuideLines(fabricCanvas.current, activeFloor.markedPoints, true); 
       }
   };
 
@@ -680,7 +673,7 @@ export default function Calculator() {
 
       setCalibrationModal(false); 
       setDrawingMode('wall');
-      setCalibLinePixels(null); // Нулиране на калибриращата линия
+      setCalibLinePixels(null); 
   };
 
   const handleGenerateWallsOnly = () => {
@@ -708,11 +701,9 @@ export default function Calculator() {
       }));
 
       if (fabricCanvas.current) {
-          // ФИКС за пропускане на обекти при изтриване: филтрираме ги първо в нов масив
           const objectsToRemove = fabricCanvas.current.getObjects().filter((obj: any) => obj.type === 'circle' || obj.customType === 'guide-line');
           objectsToRemove.forEach((obj: any) => fabricCanvas.current.remove(obj));
           
-          // Директно добавяме и рендираме стените, за да се видят веднага
           newWalls.forEach((w: any) => {
               let isSecondFloorOrAbove = activeFloor.id > stateRefs.current.floors[0].id;
               let strokeColor = isSecondFloorOrAbove ? '#3b82f6' : '#0d9488'; 
@@ -725,78 +716,83 @@ export default function Calculator() {
       }
       setDrawingMode('wall');
       
-      // Ясна обратна връзка за потребителя
       alert('Външните стени бяха очертани успешно по контура! Вече можете да начертаете вътрешните стени.');
   };
 
   const getActiveWalls = () => floors.find(f => f.id === activeFloorId)?.walls || [];
 
+  // --- ВЪРНАТА СТАРА ЛОГИКА ЗА ПОДРЕЖДАНЕ НА ПАНЕЛИТЕ ---
   const optimizeWallCore = (wallLengthMeters: number, wallHeightMeters: number, wall: any, isHorizontal: boolean) => {
-    let rowsData: any[] = [];
-    let stats: Record<string, number> = { p1: 0, p2: 0, p3: 0, p4: 0, p5: 0, p6: 0, custom: 0, totalAreaUsed: 0 };
-    
-    // Завъртаме панелите според ориентацията
-    const panels = PANEL_TYPES.map(p => isHorizontal ? { ...p, w: p.h, h: p.w } : p);
-    
-    let currentY = 0;
-    let rowIndex = 0; // ИНДЕКС ЗА ПРОСЛЕДЯВАНЕ НА РЕДОВЕТЕ
+    let minAreaWaste = Infinity;
+    let bestRowsData: any[] = [];
+    let bestStats = null;
 
-    while (currentY < wallHeightMeters - 0.01) {
-        let remainingH = wallHeightMeters - currentY;
-        
-        let possiblePanels = panels.filter(p => p.h <= remainingH + 0.05);
-        if (possiblePanels.length === 0) possiblePanels = panels; 
-        
-        possiblePanels.sort((a, b) => b.h !== a.h ? b.h - a.h : b.w - a.w);
-        
-        let rowPanel = possiblePanels[0];
-        let rowHeight = rowPanel.h;
-        let actualRowHeight = Math.min(rowHeight, remainingH);
+    const pA = isHorizontal ? { ...PANEL_A, w: PANEL_A.h, h: PANEL_A.w } : PANEL_A;
+    const pB = isHorizontal ? { ...PANEL_B, w: PANEL_B.h, h: PANEL_B.w } : PANEL_B;
 
-        let remainingW = wallLengthMeters;
-        let rowPanels: any[] = [];
+    const maxRowsA = Math.ceil(wallHeightMeters / pA.h) + 1;
+    const maxRowsB = Math.ceil(wallHeightMeters / pB.h) + 1;
+
+    for (let aRows = 0; aRows <= maxRowsA; aRows++) {
+      for (let bRows = 0; bRows <= maxRowsB; bRows++) {
+        if (aRows === 0 && bRows === 0) continue;
+        let currentTotalHeight = (aRows * pA.h) + (bRows * pB.h);
         
-        let fittingPanels = possiblePanels.filter(p => Math.abs(p.h - rowHeight) < 0.05).sort((a, b) => b.w - a.w);
+        if (currentTotalHeight >= wallHeightMeters) {
+          let sequence = [];
+          let tempA = aRows, tempB = bRows;
+          while (tempA > 0 || tempB > 0) {
+            if (tempA > 0) { sequence.push(pA); tempA--; }
+            if (tempB > 0) { sequence.push(pB); tempB--; }
+          }
 
-        // --- ЛОГИКА ЗА РАЗМИНАТИ ФУГИ (ТУХЛЕНА ЗИДАРИЯ) ---
-        const isOddRow = rowIndex % 2 !== 0;
-        // На нечетните редове започваме с половин панел, за да разместим фугите
-        if (isOddRow && fittingPanels.length > 0 && wallLengthMeters > fittingPanels[0].w) {
-            let p = fittingPanels[0];
-            let startWidth = p.w / 2;
-            rowPanels.push({ type: 'custom', panelId: p.id, width: startWidth });
-            remainingW -= startWidth;
-            stats.custom++;
-            stats.totalAreaUsed += (p.w * p.h); // Отчитаме разхода на цял панел, от който сме взели половината
-        }
+          let currentRowsData: any[] = [];
+          let stats = { aFull: 0, aHalf: 0, bFull: 0, bHalf: 0, custom: 0, totalAreaUsed: 0 };
 
-        while (remainingW > 0.01) {
-            let placed = false;
-            for (let p of fittingPanels) {
-                if (p.w <= remainingW + 0.02) { 
-                    rowPanels.push({ type: 'full', panelId: p.id, width: p.w });
-                    remainingW -= p.w;
-                    const statKey = p.id.toLowerCase();
-                    stats[statKey] = (stats[statKey] || 0) + 1;
-                    stats.totalAreaUsed += (p.w * p.h);
-                    placed = true;
-                    break;
-                }
+          sequence.forEach((panel, index) => {
+            let remainingW = wallLengthMeters;
+            let isEven = index % 2 !== 0;
+            let rowPanels = [];
+            
+            let isLastRow = index === sequence.length - 1;
+            let actualRowHeight = panel.h;
+            if (isLastRow && currentTotalHeight > wallHeightMeters) {
+               actualRowHeight = panel.h - (currentTotalHeight - wallHeightMeters);
             }
-            if (!placed) {
-                let cutPanel = fittingPanels[fittingPanels.length - 1] || rowPanel;
-                rowPanels.push({ type: 'custom', panelId: cutPanel.id, width: remainingW });
-                stats.custom++;
-                stats.totalAreaUsed += (cutPanel.w * cutPanel.h);
-                remainingW = 0;
+
+            if (isEven) {
+              let halfW = panel.w / 2;
+              rowPanels.push({ type: 'half', panelId: panel.id, width: halfW });
+              remainingW -= halfW;
+              if (panel.id === 'P1') stats.aHalf++; else stats.bHalf++;
+              stats.totalAreaUsed += (halfW * panel.h);
             }
+
+            while (remainingW >= panel.w) {
+              rowPanels.push({ type: 'full', panelId: panel.id, width: panel.w });
+              remainingW -= panel.w;
+              if (panel.id === 'P1') stats.aFull++; else stats.bFull++;
+              stats.totalAreaUsed += (panel.w * panel.h);
+            }
+
+            if (remainingW > 0.01) {
+              rowPanels.push({ type: 'custom', panelId: panel.id, width: remainingW });
+              stats.custom++;
+              stats.totalAreaUsed += (panel.w * panel.h); 
+            }
+            currentRowsData.push({ panels: rowPanels, height: actualRowHeight, origHeight: panel.h });
+          });
+
+          let waste = stats.totalAreaUsed - (wallLengthMeters * wallHeightMeters);
+          if (waste < minAreaWaste) {
+            minAreaWaste = waste; bestRowsData = currentRowsData; bestStats = stats;
+          }
         }
-        rowsData.push({ panels: rowPanels, height: actualRowHeight, origHeight: rowHeight });
-        currentY += rowHeight;
-        rowIndex++; // Увеличаваме реда
+      }
     }
 
-    return { ...wall, letter: wall.displayId, length: wallLengthMeters, height: wallHeightMeters, rows: rowsData.reverse(), stats, orientation: isHorizontal ? 'Хор' : 'Верт' };
+    if (!bestStats) bestStats = { aFull: 0, aHalf: 0, bFull: 0, bHalf: 0, custom: 0, totalAreaUsed: Infinity };
+    return { ...wall, letter: wall.displayId, length: wallLengthMeters, height: wallHeightMeters, rows: bestRowsData.reverse(), stats: bestStats, orientation: isHorizontal ? 'Хор' : 'Верт' };
   };
 
   const optimizeWall = (length: number, height: number, wall: any) => {
@@ -807,12 +803,11 @@ export default function Calculator() {
 
   const handleCalculateProject = () => {
     let projectWalls: any[] = [];
-    let globalStats: Record<string, number> = { p1: 0, p2: 0, p3: 0, p4: 0, p5: 0, p6: 0, custom: 0, totalAreaUsed: 0 };
+    let globalStats = { aFull: 0, aHalf: 0, bFull: 0, bHalf: 0, custom: 0, totalAreaUsed: 0 };
     
     let allProcessedWalls: any[] = [];
     let currentElevation = 0;
 
-    // Предварително изчисляване на центровете за всеки етаж в пиксели
     const floorCenters: Record<string, {cx: number, cy: number, ppm: number}> = {};
     floors.forEach(f => {
         const extWalls = f.walls.filter((w:any) => w.type === 'Външна');
@@ -853,7 +848,6 @@ export default function Calculator() {
 
         floor.walls.forEach((wall: any) => {
             const fData = floorCenters[floor.id];
-            // Нормализиране на координатите в метри спрямо центъра на етажа
             const mX1 = (wall.coords.x1 - fData.cx) / fData.ppm;
             const mY1 = (wall.coords.y1 - fData.cy) / fData.ppm;
             const mX2 = (wall.coords.x2 - fData.cx) / fData.ppm;
@@ -880,20 +874,17 @@ export default function Calculator() {
         let mergedFloors = [w1.floorIndex];
         let lastMergedWall = w1; 
 
-        // Вътрешните стени не се сливат между етажите, само се оптимизират директно
         if (w1.type === 'Външна') {
             for (let j = i + 1; j < allProcessedWalls.length; j++) {
                 let w2 = allProcessedWalls[j];
                 
                 if (w2.merged || w2.type !== 'Външна' || w2.floorIndex !== lastMergedWall.floorIndex + 1) continue;
 
-                // Сравняваме нормализираните координати в метри
                 const d1 = Math.hypot(lastMergedWall.mCoords.x1 - w2.mCoords.x1, lastMergedWall.mCoords.y1 - w2.mCoords.y1);
                 const d2 = Math.hypot(lastMergedWall.mCoords.x2 - w2.mCoords.x2, lastMergedWall.mCoords.y2 - w2.mCoords.y2);
                 const d3 = Math.hypot(lastMergedWall.mCoords.x1 - w2.mCoords.x2, lastMergedWall.mCoords.y1 - w2.mCoords.y2); 
                 const d4 = Math.hypot(lastMergedWall.mCoords.x2 - w2.mCoords.x1, lastMergedWall.mCoords.y2 - w2.mCoords.y1);
 
-                // ОПТИМИЗИРАН ТОЛЕРАНС ОТ 0.2М ЗА ИЗБЯГВАНЕ НА СЛИВАНЕ НА КОНЗОЛИ И ТЕРАСИ
                 if ((d1 < 0.2 && d2 < 0.2) || (d3 < 0.2 && d4 < 0.2)) {
                     totalMergedHeight += w2.height;
                     w2.merged = true;
@@ -912,12 +903,10 @@ export default function Calculator() {
                 elevation: w1.baseElevation, 
                 floorId: floors[w1.floorIndex].id 
             });
-            globalStats.p1 += optimized.stats.p1 || 0;
-            globalStats.p2 += optimized.stats.p2 || 0;
-            globalStats.p3 += optimized.stats.p3 || 0;
-            globalStats.p4 += optimized.stats.p4 || 0;
-            globalStats.p5 += optimized.stats.p5 || 0;
-            globalStats.p6 += optimized.stats.p6 || 0;
+            globalStats.aFull += optimized.stats.aFull || 0;
+            globalStats.aHalf += optimized.stats.aHalf || 0;
+            globalStats.bFull += optimized.stats.bFull || 0;
+            globalStats.bHalf += optimized.stats.bHalf || 0;
             globalStats.custom += optimized.stats.custom || 0;
             globalStats.totalAreaUsed += optimized.stats.totalAreaUsed || 0;
         }
@@ -941,19 +930,6 @@ export default function Calculator() {
     reader.readAsDataURL(file);
   };
 
-  // ПОМОЩНА ФУНКЦИЯ ЗА КОНВЕРТИРАНЕ НА BASE64 КЪМ BLOB
-  const base64ToBlob = (base64: string) => {
-    const parts = base64.split(';base64,');
-    const contentType = parts[0].split(':')[1];
-    const raw = window.atob(parts[1]);
-    const rawLength = raw.length;
-    const uInt8Array = new Uint8Array(rawLength);
-    for (let i = 0; i < rawLength; ++i) {
-      uInt8Array[i] = raw.charCodeAt(i);
-    }
-    return new Blob([uInt8Array], { type: contentType });
-  };
-
   const handleSubmitQuote = async () => {
     if (!clientName || !clientPhone || !clientLocation || !clientEmail) {
       alert("Моля, попълнете всички данни за контакт, включително имейл адрес.");
@@ -963,15 +939,12 @@ export default function Calculator() {
     setOrderStatus('sending');
 
     try {
-      // 1. Записваме в базата данни БЕЗ тежките Base64 стрингове (Payload Optimization)
       const payload = {
         clientName, clientPhone, clientLocation, clientEmail,
         totalArea: projectResult?.globalStats.totalAreaUsed || 0,
-        // underlayUrl премахнато за олекотяване на JSON
         floorsData: floors.map(f => ({
             floorId: f.id,
             floorName: f.name,
-            // underlay премахнато
             walls: projectResult?.walls.filter((w: any) => w.floorId === f.id) || [],
             ppm: f.ppm,
             bgConfig: { x: f.bgOffsetX, y: f.bgOffsetY, scaleX: f.bgScaleX, scaleY: f.bgScaleY }
@@ -979,66 +952,80 @@ export default function Calculator() {
         cadData: projectResult?.walls || []
       };
 
+      // 1. Изпращаме заявката за запазване в базата
       await fetch('/api/quotes', {
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
         body: JSON.stringify(payload)
       });
 
-      // 2. Второ: Подготвяме имейла през универсалното API (api/contact)
-      const summaryMessage = `
-        НОВА ЗАЯВКА ОТ КАЛКУЛАТОРА
-        ----------------------------------
-        Клиент: ${clientName}
-        Локация: ${clientLocation}
-        Телефон: ${clientPhone}
-        ----------------------------------
-        РЕЗУЛТАТИ ОТ ПРОЕКТА:
-        Обща площ панели: ${payload.totalArea.toFixed(2)} м²
-        Панели P1 (2.50x1.25): ${projectResult?.globalStats.p1} бр.
-        Панели P2 (2.44x1.44): ${projectResult?.globalStats.p2} бр.
-        Панели P3 (1.25x1.25): ${projectResult?.globalStats.p3} бр.
-        Панели P4 (1.22x1.22): ${projectResult?.globalStats.p4} бр.
-        Панели P5 (0.625x1.25): ${projectResult?.globalStats.p5} бр.
-        Панели P6 (0.61x1.44): ${projectResult?.globalStats.p6} бр.
-        Изрязани (Custom): ${projectResult?.globalStats.custom} бр.
-        Брой етажи: ${floors.length}
-        Брой стени общо: ${projectResult?.walls.length}
-      `;
-
-      const formData = new FormData();
-      formData.append('name', clientName);
-      formData.append('phone', clientPhone);
-      formData.append('email', clientEmail);
-      formData.append('message', summaryMessage);
-
-      // Ако има подложка на първия етаж, я превръщаме във файл и я прикачваме към мейла
-      if (floors[0].underlay) {
-        const fileBlob = base64ToBlob(floors[0].underlay);
-        formData.append('file', fileBlob, 'floor-plan.png');
-      }
-
-      const emailRes = await fetch('/api/contact', {
-        method: 'POST',
-        body: formData
+      // 2. Генерираме HTML за техническата спецификация
+      let specHtml = `<h3>Техническа спецификация:</h3>`;
+      specHtml += `<p><strong>Общо панели:</strong> ${(projectResult?.globalStats.aFull || 0) + (projectResult?.globalStats.bFull || 0)} бр.</p>`;
+      specHtml += `<p><strong>Обща квадратура:</strong> ${payload.totalArea.toFixed(2)} м²</p>`;
+      specHtml += `<ul>`;
+      projectResult?.floorsData.forEach((f: any) => {
+          const floorWalls = projectResult.walls.filter((w: any) => w.floorId === f.id);
+          if (floorWalls.length > 0) {
+              let fArea = 0, fA = 0, fB = 0, fCustom = 0;
+              floorWalls.forEach((w: any) => {
+                  fArea += w.stats.totalAreaUsed || 0;
+                  fA += w.stats.aFull || 0;
+                  fB += w.stats.bFull || 0;
+                  fCustom += w.stats.custom || 0;
+              });
+              specHtml += `<li><strong>${f.name}:</strong> Тип А: ${fA} бр, Тип Б: ${fB} бр, Изрязани: ${fCustom} бр. | Площ: ${fArea.toFixed(2)} м²</li>`;
+          }
       });
+      specHtml += `</ul>`;
 
-      if (emailRes.ok) {
-        setOrderStatus('success');
-        setTimeout(() => { 
-          setIsOrderModalOpen(false); 
-          setOrderStatus('idle'); 
-        }, 2500);
-      } else {
-        // ПОДОБРЕНА ОБРАБОТКА НА ГРЕШКАТА В МРЕЖАТА
-        const errorText = await emailRes.text();
-        console.error("API Error Response:", errorText);
-        throw new Error(`Грешка при имейл сървъра: ${emailRes.status} - ${errorText}`);
+      // 3. Подготвяме прикачените файлове за всеки етаж
+      const attachments = floors.filter(f => f.underlay).map(f => ({
+          filename: `чертеж-${f.name.replace(/\s+/g, '-')}.png`,
+          content: f.underlay.split(',')[1],
+          contentType: 'image/png'
+      }));
+
+      try {
+        // Имейл до клиента (Автоматичен отговор)
+        await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: clientEmail,
+            from: 'БИОЗИД <no-reply@biozid.bg>', 
+            subject: 'Вашето запитване към БИОЗИД е прието успешно',
+            html: `<p>Здравейте, ${clientName},</p><p>Вашето запитване за изчисляване на проект с обща площ панели ${payload.totalArea.toFixed(2)} м² е прието успешно.</p>${specHtml}<p>Нашият екип ще се свърже с Вас скоро с конкретна оферта!</p>`,
+            type: 'auto_reply'
+          })
+        });
+
+        // Имейл до администратора с прикачените файлове
+        await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: 'admin@biozid.bg', 
+            from: 'Система БИОЗИД <no-reply@biozid.bg>',
+            subject: '🚨 Нова заявка от Калкулатора',
+            html: `<p>Имате нова заявка от <strong>${clientName}</strong> (${clientPhone}) за населено място ${clientLocation}.</p><p>Имейл клиент: ${clientEmail}</p><p>Обща площ: ${payload.totalArea.toFixed(2)} кв.м.</p>${specHtml}`,
+            attachments: attachments,
+            type: 'admin_alert'
+          })
+        });
+      } catch (mailErr) {
+        console.error("Грешка при изпращане на имейлите:", mailErr);
       }
+
+      setOrderStatus('success');
+      setTimeout(() => { 
+        setIsOrderModalOpen(false); 
+        setOrderStatus('idle'); 
+      }, 2500);
 
     } catch (err) {
       console.error("Грешка:", err);
-      alert("Възникна грешка при изпращането. Моля, проверете конзолата за повече детайли. Вашата заявка към базата данни обаче може да е записана.");
+      alert("Възникна грешка при изпращането. Моля, проверете конзолата за повече детайли.");
       setOrderStatus('idle');
     }
   };
@@ -1048,11 +1035,9 @@ export default function Calculator() {
   };
 
   const Scene3D = ({ project, viewFloor }: any) => {
-    // ФИЛТРАЦИЯ ПО ЕТАЖИ
     const walls = viewFloor === 'all' ? project.walls : project.walls.filter((w: any) => w.floorId === viewFloor);
     const baseFloors = viewFloor === 'all' ? project.floorsData : project.floorsData.filter((f: any) => f.id === viewFloor);
     
-    // Изчисляване на центъра на всеки етаж локално (центрира етажите перфектно един над друг)
     const floorCenters: Record<string, {cx: number, cy: number, ppm: number}> = {};
     project.floorsData.forEach((fl: any) => {
         const floorWalls = project.walls.filter((w: any) => w.floorId === fl.id);
@@ -1085,7 +1070,6 @@ export default function Calculator() {
                 const floorWalls = project.walls.filter((w: any) => w.floorId === fl.id);
                 if (floorWalls.length === 0) return null;
                 
-                // Изчисляваме физическия размер на подложката в метри въз основа на центрираните стени
                 let mMinX = Infinity, mMaxX = -Infinity, mMinY = Infinity, mMaxY = -Infinity;
                 const fc = floorCenters[fl.id];
 
@@ -1173,7 +1157,6 @@ export default function Calculator() {
         
         <div className="block lg:hidden bg-amber-50 border-l-4 border-amber-500 p-4 mb-6 rounded-r-xl shadow-sm print:hidden">
           <div className="flex items-center gap-3">
-            <span className="text-xl">💡</span>
             <p className="text-xs text-amber-800 font-medium leading-relaxed">
               <strong>Внимание:</strong> Този инструмент работи в пълния си потенциал на десктоп версия. За максимална прецизност при чертане, моля, използвайте компютър.
             </p>
@@ -1217,7 +1200,7 @@ export default function Calculator() {
                   <>
                       {activeFloorId > 1 && (
                           <div className="bg-slate-100 p-3 rounded-xl mb-1 border border-slate-200">
-                              <span className="text-[10px] font-bold uppercase text-slate-500 mb-3 block text-center border-b border-slate-200 pb-2">🖱️ Напасване на подложката</span>
+                              <span className="text-[10px] font-bold uppercase text-slate-500 mb-3 block text-center border-b border-slate-200 pb-2">Напасване на подложката</span>
                               <div className="flex flex-col gap-2 mb-3">
                                   <div className="flex items-center justify-between gap-1">
                                       <span className="text-[10px] font-bold text-slate-500 w-16 leading-tight">Ширина (Scale X)</span>
@@ -1254,7 +1237,7 @@ export default function Calculator() {
                           <div className="bg-orange-50 border-2 border-orange-400 p-4 rounded-xl shadow-inner mt-2">
                               <strong className="text-orange-900 uppercase tracking-wide text-xs block mb-2"> Ръководство за калибриране:</strong>
                               <ol className="list-decimal pl-4 text-xs text-orange-800 leading-relaxed font-medium space-y-1">
-                                  <li>Изберете инструмента <strong>"📐 Калибратор"</strong> по-долу.</li>
+                                  <li>Изберете инструмента <strong>"Калибратор"</strong> по-долу.</li>
                                   <li>Начертайте линия върху стена (или оразмерителна линия) на чертежа, чиято реална дължина знаете.</li>
                                   <li>Въведете точния размер в метри или сантиметри в прозореца, който ще се появи.</li>
                               </ol>
@@ -1276,7 +1259,7 @@ export default function Calculator() {
 
                           <div className="grid grid-cols-2 gap-2 mb-2">
                               <button onClick={() => setDrawingMode(drawingMode === 'calibrate' ? 'none' : 'calibrate')} className={`p-2 text-[10px] font-bold uppercase rounded border transition ${drawingMode === 'calibrate' ? 'bg-indigo-600 text-white border-indigo-700 shadow-inner' : 'bg-white text-slate-700 hover:bg-indigo-50 border-slate-200'}`}>
-                                  {drawingMode === 'calibrate' ? 'Спри' : '📐 Калибратор'}
+                                  {drawingMode === 'calibrate' ? 'Спри' : 'Калибратор'}
                               </button>
                               <button onClick={() => setDrawingMode(drawingMode === 'wall' ? 'none' : 'wall')} className={`p-2 text-[10px] font-bold uppercase rounded border transition ${drawingMode === 'wall' ? 'bg-teal-600 text-white border-teal-700 shadow-inner' : 'bg-white text-slate-700 hover:bg-teal-50 border-slate-200'}`}>
                                   {drawingMode === 'wall' ? 'Спри' : 'Чертай Стена'}
@@ -1289,7 +1272,6 @@ export default function Calculator() {
                               </button>
                           </div>
 
-                          {/* ИНФОРМАЦИОННО СЪОБЩЕНИЕ ЗА ВРАТИ И ПРОЗОРЦИ */}
                           <div className="bg-blue-50 border border-blue-200 p-2 mt-2 rounded text-[10px] text-blue-800 leading-relaxed shadow-sm">
                               <strong>Важно:</strong> При чертане по подложката, в зоните с прозорци и врати, моля начертайте стените <strong>цялостно и без прекъсване</strong>. Това е нужно за правилно изчисление.
                           </div>
@@ -1369,22 +1351,20 @@ export default function Calculator() {
                   <div className="flex-1 bg-slate-50 flex flex-col relative text-slate-800 print:bg-white print:overflow-visible overflow-y-auto">
                       {projectResult ? (
                           <>
-                              {/* ГОРНА ЛЕНТА С БУТОНИ */}
                               <div className="sticky top-0 z-30 flex flex-wrap gap-4 justify-between items-center bg-white/95 backdrop-blur p-4 border-b border-slate-200 print:hidden">
                                   <button onClick={() => setViewMode('2D')} className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded text-xs font-bold uppercase tracking-widest hover:bg-slate-700 transition shadow">
                                        Върни се към чертане (2D)
                                   </button>
                                   <button onClick={handlePrint} className="flex items-center gap-2 px-6 py-2 text-xs font-bold bg-teal-600 text-white rounded hover:bg-teal-500 transition shadow">
-                                      🖨️ Печат на заявка / спецификация
+                                      Печат на заявка / спецификация
                                   </button>
                               </div>
 
-                              {/* ПОТРЕБИТЕЛСКИ ИЗГЛЕД - ЦЯЛАТА СГРАДА */}
                               <div className="relative h-[450px] border-b border-slate-200 print:hidden shrink-0">
                                   <div className="absolute top-4 left-4 z-10 bg-white/95 backdrop-blur p-5 rounded-xl shadow-xl border border-slate-200 min-w-[260px]">
                                       <h3 className="text-[10px] font-bold uppercase tracking-widest text-teal-600 border-b border-slate-100 pb-3 mb-3">Обща Спецификация (Всички етажи)</h3>
                                       <div className="space-y-2 text-xs">
-                                          <div className="flex justify-between"><span className="text-slate-500">Панели общо:</span><span className="font-bold">{projectResult.globalStats.p1 + projectResult.globalStats.p2 + projectResult.globalStats.p3 + projectResult.globalStats.p4 + projectResult.globalStats.p5 + projectResult.globalStats.p6} бр.</span></div>
+                                          <div className="flex justify-between"><span className="text-slate-500">Панели общо:</span><span className="font-bold">{projectResult.globalStats.aFull + projectResult.globalStats.bFull} бр.</span></div>
                                           <div className="flex justify-between pt-2 border-t border-slate-200"><span className="text-slate-600 font-bold uppercase text-[10px]">Обща Квадратура:</span><span className="font-black text-teal-600 text-sm">{projectResult.globalStats.totalAreaUsed.toFixed(1)} м²</span></div>
                                       </div>
                                       <button onClick={() => setIsOrderModalOpen(true)} className="w-full mt-5 bg-slate-900 text-white py-3 rounded text-[10px] font-bold uppercase tracking-widest hover:bg-teal-600 transition shadow">Изпрати запитване</button>
@@ -1392,11 +1372,11 @@ export default function Calculator() {
                                   <Scene3D project={projectResult} viewFloor={'all'} />
                               </div>
 
-                              {/* СКРИТ БЛОК ЗА ПЕЧАТ (PRINT ONLY) - ПЪЛНА ПРОИЗВОДСТВЕНА СПЕЦИФИКАЦИЯ */}
+                              {/* СКРИТ БЛОК ЗА ПЕЧАТ (PRINT ONLY) - ПЪЛНА ПРОИЗВОДСТВЕНА СПЕЦИФИКАЦИЯ БЕЗ 3D МОДЕЛ */}
                               <div className="hidden print:block w-full text-black mt-8">
                                   <h1 className="text-3xl font-bold mb-6 text-center border-b-4 border-black pb-4">ОФИЦИАЛНА ПРОИЗВОДСТВЕНА СПЕЦИФИКАЦИЯ БИОЗИД</h1>
                                   <div className="mb-8 text-lg">
-                                      <p><strong>Общо панели за целия проект:</strong> {projectResult.globalStats.p1 + projectResult.globalStats.p2 + projectResult.globalStats.p3 + projectResult.globalStats.p4 + projectResult.globalStats.p5 + projectResult.globalStats.p6} бр.</p>
+                                      <p><strong>Общо панели за целия проект:</strong> {projectResult.globalStats.aFull + projectResult.globalStats.bFull} бр.</p>
                                       <p><strong>Обща квадратура на панелите:</strong> {projectResult.globalStats.totalAreaUsed.toFixed(2)} м²</p>
                                   </div>
                                   
@@ -1404,15 +1384,11 @@ export default function Calculator() {
                                       const floorWalls = projectResult.walls.filter((w: any) => w.floorId === f.id);
                                       if (floorWalls.length === 0) return null;
                                       
-                                      let fp1 = 0, fp2 = 0, fp3 = 0, fp4 = 0, fp5 = 0, fp6 = 0, floorArea = 0, floorCustom = 0;
+                                      let floorPanelsA = 0, floorPanelsB = 0, floorCustom = 0, floorArea = 0;
                                       floorWalls.forEach((w:any) => {
                                           if (w.stats) {
-                                              fp1 += (w.stats.p1 || 0);
-                                              fp2 += (w.stats.p2 || 0);
-                                              fp3 += (w.stats.p3 || 0);
-                                              fp4 += (w.stats.p4 || 0);
-                                              fp5 += (w.stats.p5 || 0);
-                                              fp6 += (w.stats.p6 || 0);
+                                              floorPanelsA += (w.stats.aFull || 0);
+                                              floorPanelsB += (w.stats.bFull || 0);
                                               floorCustom += (w.stats.custom || 0);
                                               floorArea += w.stats.totalAreaUsed || 0;
                                           }
@@ -1422,12 +1398,6 @@ export default function Calculator() {
                                           <div key={`print-floor-${f.id}`} className="mb-12 break-inside-avoid">
                                               <h2 className="text-2xl font-bold mb-4 bg-slate-200 p-3 border border-black">{f.name}</h2>
                                               
-                                              {/* 3D МОДЕЛ В ПРИНТ БЛОКА */}
-                                              <div className="mb-6 border border-black p-2 h-[400px] relative w-full break-inside-avoid">
-                                                  <p className="text-[12px] font-bold mb-2 uppercase absolute top-2 left-2 z-10 bg-white/80 p-1">3D Модел:</p>
-                                                  <Scene3D project={projectResult} viewFloor={f.id} />
-                                              </div>
-
                                               <div className="flex gap-4 mb-4 break-inside-avoid">
                                                   {f.underlay && (
                                                       <div className="w-1/2 border border-black p-2">
@@ -1438,12 +1408,8 @@ export default function Calculator() {
                                                   )}
                                                   <div className="flex-1 border border-black p-6 text-base bg-slate-50">
                                                       <p className="mb-2"><strong>Брой стени:</strong> {floorWalls.length}</p>
-                                                      <p className="mb-2"><strong>Панели P1 (2.50x1.25):</strong> {fp1} бр.</p>
-                                                      <p className="mb-2"><strong>Панели P2 (2.44x1.44):</strong> {fp2} бр.</p>
-                                                      <p className="mb-2"><strong>Панели P3 (1.25x1.25):</strong> {fp3} бр.</p>
-                                                      <p className="mb-2"><strong>Панели P4 (1.22x1.22):</strong> {fp4} бр.</p>
-                                                      <p className="mb-2"><strong>Панели P5 (0.625x1.25):</strong> {fp5} бр.</p>
-                                                      <p className="mb-2"><strong>Панели P6 (0.61x1.44):</strong> {fp6} бр.</p>
+                                                      <p className="mb-2"><strong>Панели Тип А (2.50x1.25):</strong> {floorPanelsA} бр.</p>
+                                                      <p className="mb-2"><strong>Панели Тип Б (2.44x1.44):</strong> {floorPanelsB} бр.</p>
                                                       <p className="mb-2"><strong>Изрязани парчета:</strong> {floorCustom} бр.</p>
                                                       <p className="mb-2 border-t border-slate-300 pt-2"><strong>Площ панели за етажа:</strong> {floorArea.toFixed(2)} м²</p>
                                                   </div>
@@ -1467,7 +1433,7 @@ export default function Calculator() {
                                                               <td className="border border-black p-2 text-center">{w.length.toFixed(2)}</td>
                                                               <td className="border border-black p-2 text-center">{w.height.toFixed(2)}</td>
                                                               <td className="border border-black p-2">
-                                                                  {w.stats && `P1: ${w.stats.p1 || 0} | P2: ${w.stats.p2 || 0} | P3: ${w.stats.p3 || 0} | P4: ${w.stats.p4 || 0} | P5: ${w.stats.p5 || 0} | P6: ${w.stats.p6 || 0} | Изрез: ${w.stats.custom || 0}`}
+                                                                  {w.stats && `Тип А: ${w.stats.aFull} бр. | Тип Б: ${w.stats.bFull} бр. | Изрязани: ${w.stats.custom} бр.`}
                                                               </td>
                                                           </tr>
                                                       ))}
