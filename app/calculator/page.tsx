@@ -716,7 +716,8 @@ export default function Calculator() {
       }
       setDrawingMode('wall');
       
-      alert('Външните стени бяха очертани успешно по контура! Вече можете да начертаете вътрешните стени.');
+      // 4. СИГНАЛНО СЪОБЩЕНИЕ
+      alert('Външните стени бяха очертани успешно по контура!\n\nСИГНАЛНО СЪОБЩЕНИЕ:\nПреди да преминете към изграждане на 3D Модел, моля уверете се, че всички размери, генерирани от калкулатора по време на чертане, отговарят на размерите, описани във вашия архитектурен проект. При нужда ги коригирайте ръчно от списъка с елементи!\n\nВече можете да начертаете вътрешните стени.');
   };
 
   const getActiveWalls = () => floors.find(f => f.id === activeFloorId)?.walls || [];
@@ -945,11 +946,13 @@ export default function Calculator() {
         floorsData: floors.map(f => ({
             floorId: f.id,
             floorName: f.name,
-            walls: projectResult?.walls.filter((w: any) => w.floorId === f.id) || [],
+            walls: f.walls, // 1 & 2. Пращаме оригиналните стени (външни и вътрешни), за да не изчезват!
+            optimizedWalls: projectResult?.walls.filter((w: any) => w.floorId === f.id) || [],
             ppm: f.ppm,
-            bgConfig: { x: f.bgOffsetX, y: f.bgOffsetY, scaleX: f.bgScaleX, scaleY: f.bgScaleY }
+            bgConfig: { x: f.bgOffsetX, y: f.bgOffsetY, scaleX: f.bgScaleX, scaleY: f.bgScaleY },
+            underlay: f.underlay // 5. Задължително прикачаме подложката!
         })),
-        cadData: projectResult?.walls || []
+        cadData: floors.flatMap(f => f.walls) // Изпращаме масива с оригиналните стени
       };
 
       // 1. Изпращаме заявката за запазване в базата
@@ -979,15 +982,8 @@ export default function Calculator() {
       });
       specHtml += `</ul>`;
 
-      // 3. Подготвяме прикачените файлове за всеки етаж
-      const attachments = floors.filter(f => f.underlay).map(f => ({
-          filename: `чертеж-${f.name.replace(/\s+/g, '-')}.png`,
-          content: f.underlay.split(',')[1],
-          contentType: 'image/png'
-      }));
-
+      // Имейл до клиента (Автоматичен отговор)
       try {
-        // Имейл до клиента (Автоматичен отговор)
         await fetch('/api/send-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -999,22 +995,37 @@ export default function Calculator() {
             type: 'auto_reply'
           })
         });
+      } catch (err) {
+        console.error("Грешка при изпращане на автоматичния отговор: ", err);
+      }
 
-        // Имейл до администратора с прикачените файлове
-        await fetch('/api/send-email', {
+      // 3. Формираме FormData точно както в контактната форма, за да работи изпращането до office@biozid.bg!
+      const formData = new FormData();
+      formData.append('name', clientName);
+      formData.append('phone', clientPhone);
+      formData.append('email', clientEmail);
+      
+      const plainMessage = `НОВА ЗАЯВКА ОТ КАЛКУЛАТОРА!\n\nНаселено място: ${clientLocation}\nОбщо панели: ${(projectResult?.globalStats.aFull || 0) + (projectResult?.globalStats.bFull || 0)} бр.\nОбща квадратура: ${payload.totalArea.toFixed(2)} м²\n\nМоля, влезте в Админ панела, за да видите пълния 3D проект, стените и прикачените подложки!`;
+      formData.append('message', plainMessage);
+
+      const firstFloorWithUnderlay = floors.find(f => f.underlay);
+      if (firstFloorWithUnderlay) {
+          try {
+              const res = await fetch(firstFloorWithUnderlay.underlay);
+              const blob = await res.blob();
+              formData.append('file', blob, `plan-${firstFloorWithUnderlay.name.replace(/\s+/g, '-')}.png`);
+          } catch (e) {
+              console.error("Грешка при прикачане на подложката: ", e);
+          }
+      }
+
+      try {
+        await fetch('/api/contact', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            to: 'admin@biozid.bg', 
-            from: 'Система БИОЗИД <no-reply@biozid.bg>',
-            subject: '🚨 Нова заявка от Калкулатора',
-            html: `<p>Имате нова заявка от <strong>${clientName}</strong> (${clientPhone}) за населено място ${clientLocation}.</p><p>Имейл клиент: ${clientEmail}</p><p>Обща площ: ${payload.totalArea.toFixed(2)} кв.м.</p>${specHtml}`,
-            attachments: attachments,
-            type: 'admin_alert'
-          })
+          body: formData
         });
       } catch (mailErr) {
-        console.error("Грешка при изпращане на имейлите:", mailErr);
+        console.error("Грешка при изпращане на имейл до office@biozid.bg:", mailErr);
       }
 
       setOrderStatus('success');
