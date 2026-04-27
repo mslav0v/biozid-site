@@ -34,11 +34,15 @@ export default function ContactsPage() {
   // Логика за изпращане на формата с файл
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    
+    // КОРЕКЦИЯ: Запазваме референция към формата ПРЕДИ асинхронните операции
+    const formElement = e.currentTarget;
+    
     setIsSubmitting(true);
     setSubmitStatus('idle');
 
-    // Събираме всички данни от формата, включително файла
-    const formData = new FormData(e.currentTarget);
+    // Събираме всички данни от формата, използвайки запазената референция
+    const formData = new FormData(formElement);
 
     try {
       const response = await fetch('/api/contact', {
@@ -48,7 +52,12 @@ export default function ContactsPage() {
 
       if (response.ok) {
         setSubmitStatus('success');
-        e.currentTarget.reset();
+        
+        // КОРЕКЦИЯ: Използваме запазената референция за ресетване, за да избегнем null грешката
+        if (formElement) {
+          formElement.reset();
+        }
+        
         setMessage("");
         setFileName(null);
       } else {
