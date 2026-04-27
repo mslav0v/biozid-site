@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
+
+// Инициализираме Resend с API ключа от Environment Variables
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: Request) {
   try {
@@ -11,43 +14,25 @@ export async function POST(request: Request) {
     const message = formData.get('message') as string;
     const file = formData.get('file') as File | null;
 
-    // ОДИТ: Преминаваме към ПОРТ 465 (SSL). 
-    // Това е най-стриктният и сигурен метод за връзка със сървъра edison.
-    const transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST,
-      port: 465, 
-      secure: true, // Задължително true за порт 465
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-      tls: {
-        rejectUnauthorized: false 
-      },
-      connectionTimeout: 10000, // 10 секунди макс за свързване
-      greetingTimeout: 10000,   // 10 секунди макс за поздрав от сървъра
-      socketTimeout: 15000,     // 15 секунди макс за активност на сокета
-    });
-
-    // ДИАГНОСТИКА: Проверяваме връзката преди пращане. 
-    // Ако тук има проблем, ще го видим в лога веднага.
-    try {
-      await transporter.verify();
-      console.log("SMTP Connection verified successfully on port 465");
-    } catch (verifyError: any) {
-      console.error("SMTP Verify Error:", verifyError.message);
-      return NextResponse.json({ 
-        success: false, 
-        error: `Сървърът edison отказа връзка на порт 465: ${verifyError.message}` 
-      }, { status: 500 });
+    // Подготовка на прикачения файл за Resend API
+    let attachments = [];
+    if (file && file.size > 0) {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      attachments.push({
+        filename: file.name,
+        content: buffer,
+      });
     }
 
     // 1. ИМЕЙЛ КЪМ АДМИНИСТРАТОРА (БИОЗИД)
-    const mailOptions: any = {
-      from: `"Биозид Калкулатор" <${process.env.EMAIL_USER}>`,
-      to: process.env.EMAIL_USER, 
-      replyTo: email,
+    // ЗАБЕЛЕЖКА: Използваме "onboarding@resend.dev" като първоначален изпращач. 
+    // След верификация на домейна в Resend, ще го променим на office@biozid.bg.
+    const adminEmailTask = resend.emails.send({
+      from: 'Biozid Calculator <onboarding@resend.dev>',
+      to: 'office@biozid.bg', 
+      reply_to: email,
       subject: `Ново запитване от калкулатора: ${name}`,
+      attachments: attachments,
       html: `
         <div style="font-family: sans-serif; color: #333;">
           <h3 style="color: #0f766e; border-bottom: 1px solid #eee; padding-bottom: 10px;">Ново запитване от biozid.bg</h3>
@@ -60,16 +45,11 @@ export async function POST(request: Request) {
           </div>
         </div>
       `,
-    };
-
-    if (file && file.size > 0) {
-      const buffer = Buffer.from(await file.arrayBuffer());
-      mailOptions.attachments = [{ filename: file.name, content: buffer }];
-    }
+    });
 
     // 2. АВТОМАТИЧЕН ОТГОВОР КЪМ КЛИЕНТА
-    const autoReplyOptions = {
-      from: `"БИОЗИД" <${process.env.EMAIL_USER}>`,
+    const autoReplyTask = resend.emails.send({
+      from: 'БИОЗИД <onboarding@resend.dev>',
       to: email, 
       subject: `Благодарим Ви за запитването, ${name}!`,
       html: `
@@ -87,20 +67,18 @@ export async function POST(request: Request) {
           </div>
         </div>
       `,
-    };
+    });
 
-    // ОДИТ: Използваме Promise.all, за да пратим двата имейла едновременно.
-    await Promise.all([
-      transporter.sendMail(mailOptions),
-      transporter.sendMail(autoReplyOptions)
-    ]);
+    // Изпращаме двата имейла паралелно чрез Promise.all за максимална бързина
+    await Promise.all([adminEmailTask, autoReplyTask]);
 
     return NextResponse.json({ success: true });
+
   } catch (error: any) {
-    console.error('Final Catch - Email sending error:', error.message);
+    console.error('Resend API Error:', error.message);
     return NextResponse.json({ 
       success: false, 
-      error: `Грешка при изпращане: ${error.message}` 
+      error: `Грешка при изпращане (Resend): ${error.message}` 
     }, { status: 500 });
   }
 }
