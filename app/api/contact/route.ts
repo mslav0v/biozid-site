@@ -25,12 +25,11 @@ export async function POST(request: Request) {
     }
 
     // 1. ИМЕЙЛ КЪМ АДМИНИСТРАТОРА (БИОЗИД)
-    // ЗАБЕЛЕЖКА: Използваме "onboarding@resend.dev" като първоначален изпращач. 
-    // След верификация на домейна в Resend, ще го променим на office@biozid.bg.
+    // КОРЕКЦИЯ: Използваме "replyTo" вместо "reply_to", за да мине проверката на TypeScript
     const adminEmailTask = resend.emails.send({
       from: 'Biozid Calculator <onboarding@resend.dev>',
       to: 'office@biozid.bg', 
-      reply_to: email,
+      replyTo: email, 
       subject: `Ново запитване от калкулатора: ${name}`,
       attachments: attachments,
       html: `
