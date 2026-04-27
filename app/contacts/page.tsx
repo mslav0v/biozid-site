@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import Link from 'next/link';
@@ -12,6 +12,9 @@ export default function ContactsPage() {
   // Добавяме състояния за статуса на изпращане
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+
+  // 1. СЪЗДАВАМЕ ПОСТОЯННА РЕФЕРЕНЦИЯ КЪМ ФОРМАТА
+  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -35,29 +38,28 @@ export default function ContactsPage() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     
-    // КОРЕКЦИЯ: Запазваме референция към формата ПРЕДИ асинхронните операции
-    const formElement = e.currentTarget;
+    // Подсигуряваме се, че формата съществува
+    if (!formRef.current) return;
     
     setIsSubmitting(true);
     setSubmitStatus('idle');
 
-    // Събираме всички данни от формата, използвайки запазената референция
-    const formData = new FormData(formElement);
+    // 2. ВЗИМАМЕ ДАННИТЕ ДИРЕКТНО ОТ РЕФЕРЕНЦИЯТА
+    const formData = new FormData(formRef.current);
 
     try {
       const response = await fetch('/api/contact', {
         method: 'POST',
-        body: formData, // Изпращаме директно FormData (без headers, за да може браузърът сам да сетне boundary)
+        body: formData, // Изпращаме директно FormData
       });
 
       if (response.ok) {
         setSubmitStatus('success');
         
-        // КОРЕКЦИЯ: Използваме запазената референция за ресетване, за да избегнем null грешката
-        if (formElement) {
-          formElement.reset();
-        }
+        // 3. БЕЗОПАСНО НУЛИРАНЕ ЧРЕЗ РЕФЕРЕНЦИЯТА
+        formRef.current.reset();
         
+        // Нулираме и контролираните React state-ове
         setMessage("");
         setFileName(null);
       } else {
@@ -164,7 +166,8 @@ export default function ContactsPage() {
             <div className="lg:col-span-3 bg-white rounded-[40px] p-8 md:p-14 shadow-2xl border border-slate-100">
               <h3 className="text-2xl font-light text-slate-900 mb-8">Изпратете запитване</h3>
               
-              <form className="space-y-8" onSubmit={handleSubmit}>
+              {/* 4. ЗАКАЧАМЕ РЕФЕРЕНЦИЯТА КЪМ ТАГА НА ФОРМАТА */}
+              <form ref={formRef} className="space-y-8" onSubmit={handleSubmit}>
                 
                 {/* Име и Телефон в един ред на десктоп */}
                 <div className="grid md:grid-cols-2 gap-8">
