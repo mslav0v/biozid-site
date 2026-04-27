@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       from: 'Biozid Calculator <office@biozid.bg>',
       to: 'office@biozid.bg', 
       replyTo: email, 
-      subject: `Ново запитване от калкулатора: ${name}`,
+      subject: `Запитване от : ${name}`,
       attachments: attachments,
       html: `
         <div style="font-family: sans-serif; color: #333;">
