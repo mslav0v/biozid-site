@@ -11,20 +11,41 @@ export async function POST(request: Request) {
     const message = formData.get('message') as string;
     const file = formData.get('file') as File | null;
 
+    // ОДИТ: Добавяме стриктни тайм-аути. Ако сървърът не отговори до 10 сек, 
+    // функцията ще върне грешка веднага, вместо да чака 30 сек и да гръмне с Timeout.
     const transporter = nodemailer.createTransport({
       host: process.env.EMAIL_HOST,
-      port: 465,
-      secure: true,
+      port: 587, 
+      secure: false, 
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
       },
+      tls: {
+        rejectUnauthorized: false 
+      },
+      connectionTimeout: 10000, // 10 секунди макс за свързване
+      greetingTimeout: 10000,   // 10 секунди макс за поздрав от сървъра
+      socketTimeout: 15000,     // 15 секунди макс за активност на сокета
     });
+
+    // ДИАГНОСТИКА: Проверяваме връзката преди пращане. 
+    // Ако тук има проблем, ще го видим в лога веднага.
+    try {
+      await transporter.verify();
+      console.log("SMTP Connection verified successfully");
+    } catch (verifyError: any) {
+      console.error("SMTP Verify Error:", verifyError.message);
+      return NextResponse.json({ 
+        success: false, 
+        error: `Сървърът edison отказа връзка: ${verifyError.message}` 
+      }, { status: 500 });
+    }
 
     // 1. ИМЕЙЛ КЪМ АДМИНИСТРАТОРА (БИОЗИД)
     const mailOptions: any = {
       from: `"Биозид Калкулатор" <${process.env.EMAIL_USER}>`,
-      to: process.env.EMAIL_USER, // Получавате го вие
+      to: process.env.EMAIL_USER, 
       replyTo: email,
       subject: `Ново запитване от калкулатора: ${name}`,
       html: `
@@ -49,7 +70,7 @@ export async function POST(request: Request) {
     // 2. АВТОМАТИЧЕН ОТГОВОР КЪМ КЛИЕНТА
     const autoReplyOptions = {
       from: `"БИОЗИД" <${process.env.EMAIL_USER}>`,
-      to: email, // Изпраща се до клиента
+      to: email, 
       subject: `Благодарим Ви за запитването, ${name}!`,
       html: `
         <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
@@ -68,13 +89,19 @@ export async function POST(request: Request) {
       `,
     };
 
-    // Изпращаме и двата имейла
-    await transporter.sendMail(mailOptions);
-    await transporter.sendMail(autoReplyOptions);
+    // ОДИТ: Използваме Promise.all, за да пратим двата имейла едновременно.
+    // Това пести време и намалява шанса за Timeout във Vercel.
+    await Promise.all([
+      transporter.sendMail(mailOptions),
+      transporter.sendMail(autoReplyOptions)
+    ]);
 
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Email sending error:', error);
-    return NextResponse.json({ success: false, error: 'Failed to send email' }, { status: 500 });
+  } catch (error: any) {
+    console.error('Final Catch - Email sending error:', error.message);
+    return NextResponse.json({ 
+      success: false, 
+      error: `Грешка при изпращане: ${error.message}` 
+    }, { status: 500 });
   }
 }
