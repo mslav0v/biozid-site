@@ -44,7 +44,7 @@ function TemplateInfo() {
     <div className="bg-teal-50 border border-teal-200 p-3 rounded mb-4 text-xs text-teal-800 leading-relaxed shadow-inner">
       <strong>Избран модел: {modelName}</strong><br/>
       Ориентировъчна площ: {templateArea} м². 
-      Качете чертеж на терена си по-долу и начертайте външните стени, за да изчислим точната спецификация за панелите.
+      Качете чертеж на терена си по-долу и начертайте външните стени (размери от ОС до ОС), за да изчислим точната спецификация за панелите.
     </div>
   );
 }
@@ -68,15 +68,10 @@ export default function Calculator() {
   const fabricCanvas = useRef<any>(null);
   const adjustIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
-  const [drawingMode, setDrawingMode] = useState<'none' | 'wall' | 'point' | 'move-bg' | 'calibrate'>('none'); 
+  const [drawingMode, setDrawingMode] = useState<'none' | 'wall' | 'point' | 'move-bg'>('none'); 
   const [wallType, setWallType] = useState<'Външна' | 'Вътрешна'>('Външна');
   
   const [pixelsPerMeter, setPixelsPerMeter] = useState<number | null>(null);
-  const [calibrationModal, setCalibrationModal] = useState<boolean>(false);
-  const [calibLinePixels, setCalibLinePixels] = useState<number | null>(null);
-  const [calibAreaInput, setCalibAreaInput] = useState<string>(''); 
-  const [calibLengthInput, setCalibLengthInput] = useState<string>(''); 
-  const [calibHeightInput, setCalibHeightInput] = useState<string>('280');
 
   const [editingWallId, setEditingWallId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
@@ -109,6 +104,12 @@ export default function Calculator() {
   }, [activeFloorId, floors]);
 
   const handleAddFloor = () => {
+      if (floors.some(f => f.walls.length > 0)) {
+          if (!window.confirm("ВНИМАНИЕ:\nПреди да преминете към добавяне на следващ етаж, е необходимо да сверите и при необходимост да редактирате данните от дължините на стените с тези от вашия архитектурен проект!\n\nИскате ли да продължите?")) {
+              return;
+          }
+      }
+
       const newId = floors.length > 0 ? Math.max(...floors.map(f => f.id)) + 1 : 1;
       const inheritPpm = floors.length > 0 ? floors[floors.length - 1].ppm : null;
       const newFloor = { id: newId, name: `Етаж ${newId}`, walls: [], markedPoints: [], underlay: null, ppm: inheritPpm, height: 2.80, bgOffsetX: 0, bgOffsetY: 0, bgScaleX: 1, bgScaleY: 1 };
@@ -117,9 +118,27 @@ export default function Calculator() {
       setViewMode('2D'); 
   };
 
+  const handleDeleteFloor = (floorId: number) => {
+      if (floors.length <= 1) {
+          alert("Не можете да изтриете единствения етаж.");
+          return;
+      }
+      if (window.confirm(`Сигурни ли сте, че искате да изтриете ${floors.find(f => f.id === floorId)?.name}? Всички стени и точки на него ще бъдат премахнати.`)) {
+          const updatedFloors = floors.filter(f => f.id !== floorId);
+          setFloors(updatedFloors);
+          if (activeFloorId === floorId) {
+              setActiveFloorId(updatedFloors[0].id);
+          }
+          setViewMode('2D');
+      }
+  };
+
   const saveWallToState = (wallId: string, displayId: string, lengthInMeters: number, coords: any) => {
+      const currentFloor = stateRefs.current.floors[stateRefs.current.activeFloorIndex];
+      const h = currentFloor ? currentFloor.height : stateRefs.current.globalWallHeight;
       const newWall = {
-          id: wallId, displayId: displayId, length: lengthInMeters, height: stateRefs.current.globalWallHeight, type: stateRefs.current.wallType, cutouts: [], coords: coords 
+          id: wallId, displayId: displayId, length: lengthInMeters, height: h, type: stateRefs.current.wallType, cutouts: [], coords: coords,
+          rows: [], stats: { aFull: 0, aHalf: 0, bFull: 0, bHalf: 0, custom: 0, totalAreaUsed: 0 } 
       };
       setFloors(prev => prev.map((floor) => {
           if (floor.id !== stateRefs.current.activeFloorId) return floor;
@@ -146,17 +165,18 @@ export default function Calculator() {
     nativeImg.onload = () => {
       const FabricImageClass = fabric.FabricImage || fabric.Image;
       const img = new FabricImageClass(nativeImg);
-      const canvasW = canvas.width || canvas.getWidth?.() || 800;
-      const canvasH = canvas.height || canvas.getHeight?.() || 600;
       
-      const baseScale = Math.min(canvasW / img.width, canvasH / img.height) * 0.9;
+      const LOGICAL_W = 800;
+      const LOGICAL_H = 600;
+      
+      const baseScale = Math.min(LOGICAL_W / img.width, LOGICAL_H / img.height) * 0.9;
       const finalScaleX = baseScale * customScaleX;
       const finalScaleY = baseScale * customScaleY;
       
       img.set({ 
           originX: 'center', originY: 'center', 
-          left: (canvasW / 2) + offsetX, 
-          top: (canvasH / 2) + offsetY, 
+          left: (LOGICAL_W / 2) + offsetX, 
+          top: (LOGICAL_H / 2) + offsetY, 
           scaleX: finalScaleX, scaleY: finalScaleY, 
           opacity: 0.5, selectable: false, evented: false 
       });
@@ -234,9 +254,8 @@ export default function Calculator() {
       
       if (points.length > 1) {
           for (let i = 1; i < points.length; i++) {
-              const isFirstLine = i === 1 && isCalibratingState;
-              const lineStroke = isFirstLine ? '#ef4444' : 'rgba(244, 63, 94, 0.6)';
-              const strokeW = isFirstLine ? 4 : 2;
+              const lineStroke = 'rgba(244, 63, 94, 0.6)';
+              const strokeW = 2;
               
               const line = new fabric.Line([points[i-1].x, points[i-1].y, points[i].x, points[i].y], {
                   stroke: lineStroke, strokeWidth: strokeW, strokeDashArray: [5, 5], selectable: false, evented: false, customType: 'guide-line'
@@ -267,8 +286,9 @@ export default function Calculator() {
 
       if (fabricCanvas.current) {
           const allObjects = fabricCanvas.current.getObjects();
-          const targetObj = allObjects.find((o: any) => o.customId === lastAction.elementId);
-          if (targetObj) { fabricCanvas.current.remove(targetObj); fabricCanvas.current.renderAll(); }
+          const targets = allObjects.filter((o: any) => o.customId === lastAction.elementId);
+          targets.forEach((obj: any) => fabricCanvas.current.remove(obj));
+          fabricCanvas.current.renderAll();
       }
 
       setFloors(prev => prev.map(floor => {
@@ -367,16 +387,30 @@ export default function Calculator() {
         pointer = applyMagneticSnap(pointer);
 
         if (stateRefs.current.drawingMode === 'point') {
+            let finalX = pointer.x;
+            let finalY = pointer.y;
+            const currentFloor = stateRefs.current.floors[stateRefs.current.activeFloorIndex];
+
+            if (o.e && o.e.shiftKey && currentFloor.markedPoints.length > 0) {
+                const lastPoint = currentFloor.markedPoints[currentFloor.markedPoints.length - 1];
+                const dx = Math.abs(finalX - lastPoint.x);
+                const dy = Math.abs(finalY - lastPoint.y);
+                if (dx > dy) {
+                    finalY = lastPoint.y; 
+                } else {
+                    finalX = lastPoint.x; 
+                }
+            }
+
             const pointId = generateUniqueId();
             const circle = new fabric.Circle({ 
-                radius: 4, fill: '#f43f5e', left: pointer.x, top: pointer.y,
+                radius: 2, fill: '#f43f5e', left: finalX, top: finalY,
                 originX: 'center', originY: 'center', customId: pointId, 
                 selectable: true, hasControls: false, hasBorders: false, hoverCursor: 'move' 
             });
             canvas.add(circle);
             
-            const currentFloor = stateRefs.current.floors[stateRefs.current.activeFloorIndex];
-            const newPoints = [...currentFloor.markedPoints, { id: pointId, x: pointer.x, y: pointer.y }];
+            const newPoints = [...currentFloor.markedPoints, { id: pointId, x: finalX, y: finalY }];
             
             setFloors(prev => prev.map(f => f.id === stateRefs.current.activeFloorId ? { ...f, markedPoints: newPoints } : f));
             setActionHistory(prev => [...prev, { type: 'point', floorId: stateRefs.current.activeFloorId, elementId: pointId }]);
@@ -393,10 +427,8 @@ export default function Calculator() {
         
         let isSecondFloorOrAbove = stateRefs.current.activeFloorId > stateRefs.current.floors[0].id;
         
-        let strokeColor = stateRefs.current.drawingMode === 'calibrate' ? '#8b5cf6' : 
-            (stateRefs.current.wallType === 'Външна' ? (isSecondFloorOrAbove ? '#3b82f6' : '#0d9488') : '#64748b'); 
-        
-        let strokeWidth = stateRefs.current.drawingMode === 'calibrate' ? 4 : (stateRefs.current.wallType === 'Външна' ? 6 : 4);
+        let strokeColor = stateRefs.current.wallType === 'Външна' ? (isSecondFloorOrAbove ? '#3b82f6' : '#0d9488') : '#64748b'; 
+        let strokeWidth = stateRefs.current.wallType === 'Външна' ? 6 : 4;
 
         currentLine = new fabric.Line([startX, startY, startX, startY], {
           strokeWidth, fill: strokeColor, stroke: strokeColor, originX: 'center', originY: 'center', selectable: false, evented: false, strokeLineCap: 'round', customId: tempElementId
@@ -428,7 +460,7 @@ export default function Calculator() {
 
         let snapX = pointer.x; let snapY = pointer.y;
         
-        if (stateRefs.current.drawingMode === 'wall' || stateRefs.current.drawingMode === 'calibrate') {
+        if (stateRefs.current.drawingMode === 'wall') {
             let dx = pointer.x - startX; let dy = pointer.y - startY;
             let angle = Math.abs(Math.atan2(dy, dx) * 180 / Math.PI);
             
@@ -445,10 +477,10 @@ export default function Calculator() {
         if (stateRefs.current.drawingMode === 'move-bg') {
             isDraggingBg = false;
             if (canvas.backgroundImage) {
-                 const canvasW = canvas.width || canvas.getWidth?.() || 800;
-                 const canvasH = canvas.height || canvas.getHeight?.() || 600;
-                 const finalOffsetX = canvas.backgroundImage.left - (canvasW / 2);
-                 const finalOffsetY = canvas.backgroundImage.top - (canvasH / 2);
+                 const LOGICAL_W = 800;
+                 const LOGICAL_H = 600;
+                 const finalOffsetX = canvas.backgroundImage.left - (LOGICAL_W / 2);
+                 const finalOffsetY = canvas.backgroundImage.top - (LOGICAL_H / 2);
 
                  setFloors(prev => prev.map(f => f.id === stateRefs.current.activeFloorId ? { ...f, bgOffsetX: finalOffsetX, bgOffsetY: finalOffsetY } : f));
             }
@@ -468,14 +500,6 @@ export default function Calculator() {
         const mode = stateRefs.current.drawingMode;
         const currentFloor = stateRefs.current.floors[stateRefs.current.activeFloorIndex];
 
-        if (mode === 'calibrate') {
-            setCalibLinePixels(lengthInPixels);
-            setCalibrationModal(true);
-            canvas.remove(currentLine);
-            currentLine = null;
-            return;
-        }
-
         if (mode === 'wall') {
             const displayId = getWallLetter(currentFloor.walls.length);
             const wallId = `wall-${tempElementId}`;
@@ -488,6 +512,16 @@ export default function Calculator() {
             } else {
                 const lengthInMeters = lengthInPixels / stateRefs.current.pixelsPerMeter;
                 saveWallToState(wallId, displayId, lengthInMeters, coords);
+
+                const cx = (currentLine.x1 + currentLine.x2) / 2;
+                const cy = (currentLine.y1 + currentLine.y2) / 2;
+                const text = new fabric.Text(displayId, {
+                    left: cx, top: cy, fontSize: 16, fontWeight: 'bold', fill: '#0f172a',
+                    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+                    originX: 'center', originY: 'center', selectable: false, evented: false,
+                    customId: wallId, customType: 'wall-label'
+                });
+                canvas.add(text);
             }
         } 
         currentLine = null;
@@ -503,7 +537,7 @@ export default function Calculator() {
               const newPoints = currentFloor.markedPoints.map((p: any) => 
                   p.id === pointId ? { ...p, x: snapped.x, y: snapped.y } : p
               );
-              redrawGuideLines(canvas, newPoints, calibrationModal);
+              redrawGuideLines(canvas, newPoints, false);
           }
       });
 
@@ -532,7 +566,7 @@ export default function Calculator() {
             if (prevFloor.markedPoints && prevFloor.markedPoints.length > 0) {
                  prevFloor.markedPoints.forEach((p: any) => {
                      const circle = new fabric.Circle({ 
-                         radius: 4, fill: '#38bdf8', left: p.x, top: p.y,
+                         radius: 2, fill: '#38bdf8', left: p.x, top: p.y,
                          originX: 'center', originY: 'center', opacity: 0.6,
                          selectable: false, evented: false
                      });
@@ -549,18 +583,28 @@ export default function Calculator() {
               strokeWidth, fill: strokeColor, stroke: strokeColor, originX: 'center', originY: 'center', selectable: false, evented: false, strokeLineCap: 'round', customId: w.id
             });
             canvas.add(line);
+
+            const cx = (w.coords.x1 + w.coords.x2) / 2;
+            const cy = (w.coords.y1 + w.coords.y2) / 2;
+            const text = new fabric.Text(w.displayId, {
+                left: cx, top: cy, fontSize: 16, fontWeight: 'bold', fill: '#0f172a',
+                backgroundColor: 'rgba(255, 255, 255, 0.85)',
+                originX: 'center', originY: 'center', selectable: false, evented: false,
+                customId: w.id, customType: 'wall-label'
+            });
+            canvas.add(text);
         });
 
         if (currentFloorData.markedPoints.length > 0) {
             currentFloorData.markedPoints.forEach((p: any) => {
                 const circle = new fabric.Circle({ 
-                    radius: 4, fill: '#f43f5e', left: p.x, top: p.y,
+                    radius: 2, fill: '#f43f5e', left: p.x, top: p.y,
                     originX: 'center', originY: 'center', customId: p.id, 
                     selectable: true, hasControls: false, hasBorders: false, hoverCursor: 'move'
                 });
                 canvas.add(circle);
             });
-            redrawGuideLines(canvas, currentFloorData.markedPoints, calibrationModal);
+            redrawGuideLines(canvas, currentFloorData.markedPoints, false);
         }
       }
     }
@@ -576,8 +620,9 @@ export default function Calculator() {
     };
     window.addEventListener('resize', handleResize);
     return () => { window.removeEventListener('resize', handleResize); if (fabricCanvas.current) { fabricCanvas.current.dispose(); fabricCanvas.current = null; }};
-  }, [viewMode, activeFloorId, redrawGuideLines, calibrationModal, updateCanvasBackground]); 
+  }, [viewMode, activeFloorId, redrawGuideLines, updateCanvasBackground]); 
 
+  // --- ИНИЦИИРАНЕ НА РЕДАКЦИЯ: ДИРЕКТНО ПРИЛАГАНЕ НА ГЛОБАЛНО КАЛИБРИРАНЕ ---
   const handleWallEditSave = (wallId: string) => {
       const newL = parseFloat(editValue);
       const newH = parseFloat(editHeightValue);
@@ -585,113 +630,64 @@ export default function Calculator() {
 
       const newLengthInMeters = unit === 'cm' ? newL / 100 : newL;
       const newHeightInMeters = unit === 'cm' ? newH / 100 : newH;
-      const ppm = stateRefs.current.pixelsPerMeter;
-      if (!ppm) return;
 
-      const newLengthInPixels = newLengthInMeters * ppm;
-
-      setFloors(prev => prev.map(floor => {
-          if (floor.id !== activeFloorId) return floor;
-
-          const wall = floor.walls.find((w: any) => w.id === wallId);
-          if (!wall) return floor;
-
-          const dx = wall.coords.x2 - wall.coords.x1;
-          const dy = wall.coords.y2 - wall.coords.y1;
-          const angle = Math.atan2(dy, dx);
-
-          const oldX2 = wall.coords.x2;
-          const oldY2 = wall.coords.y2;
-
-          const newX2 = wall.coords.x1 + Math.cos(angle) * newLengthInPixels;
-          const newY2 = wall.coords.y1 + Math.sin(angle) * newLengthInPixels;
-
-          const updatedWalls = floor.walls.map((w: any) => {
-              if (w.id === wallId) {
-                  if (fabricCanvas.current) {
-                      const obj = fabricCanvas.current.getObjects().find((o:any) => o.customId === w.id);
-                      if (obj) { obj.set({ x2: newX2, y2: newY2 }); }
-                  }
-                  return { ...w, length: newLengthInMeters, height: newHeightInMeters, coords: { ...w.coords, x2: newX2, y2: newY2 } };
-              }
-
-              let changed = false;
-              let newCoords = { ...w.coords };
-              
-              if (Math.hypot(w.coords.x1 - oldX2, w.coords.y1 - oldY2) < 5) {
-                  newCoords.x1 = newX2; newCoords.y1 = newY2; changed = true;
-              }
-              if (Math.hypot(w.coords.x2 - oldX2, w.coords.y2 - oldY2) < 5) {
-                  newCoords.x2 = newX2; newCoords.y2 = newY2; changed = true;
-              }
-
-              if (changed) {
-                  const newLenPx = Math.hypot(newCoords.x2 - newCoords.x1, newCoords.y2 - newCoords.y1);
-                  if (fabricCanvas.current) {
-                      const obj = fabricCanvas.current.getObjects().find((o:any) => o.customId === w.id);
-                      if (obj) { obj.set({ x1: newCoords.x1, y1: newCoords.y1, x2: newCoords.x2, y2: newCoords.y2 }); }
-                  }
-                  return { ...w, length: newLenPx / ppm, coords: newCoords };
-              }
-              return w;
-          });
-
-          if (fabricCanvas.current) fabricCanvas.current.renderAll();
-          return { ...floor, walls: updatedWalls };
-      }));
-
+      handleGlobalCalibration(wallId, newLengthInMeters, newHeightInMeters);
+      
       setEditingWallId(null);
   };
 
-  const openCalibrationModal = () => {
-      setCalibrationModal(true);
-      if (fabricCanvas.current && activeFloor && activeFloor.markedPoints.length >= 2) {
-          redrawGuideLines(fabricCanvas.current, activeFloor.markedPoints, true); 
-      }
-  };
+  // ДЕЙСТВИЕ: ГЛОБАЛНО МАЩАБИРАНЕ
+  const handleGlobalCalibration = (wallId: string, newLengthInMeters: number, newHeightInMeters: number) => {
+      const floor = floors.find(f => f.id === activeFloorId);
+      const wall = floor?.walls.find((w: any) => w.id === wallId);
+      if (!wall) return;
 
-  const handleAreaCalibrationSubmit = () => {
-      const realLength = parseFloat(calibLengthInput);
-      const hVal = parseFloat(calibHeightInput);
+      const lengthInPixels = Math.hypot(wall.coords.x2 - wall.coords.x1, wall.coords.y2 - wall.coords.y1);
+      const newPpm = lengthInPixels / newLengthInMeters;
 
-      if(!realLength || realLength <= 0 || !hVal || hVal <= 0 || !calibLinePixels) {
-          alert("Моля, въведете валидна дължина на стената и височина.");
-          return;
-      }
-
-      const lengthInMeters = unit === 'cm' ? realLength / 100 : realLength;
-      const ppm = calibLinePixels / lengthInMeters;
-      const wallHeightInMeters = unit === 'cm' ? hVal / 100 : hVal;
-      
-      setPixelsPerMeter(ppm);
-      setGlobalWallHeight(wallHeightInMeters);
+      setPixelsPerMeter(newPpm);
+      setGlobalWallHeight(newHeightInMeters);
 
       setFloors(prev => prev.map(f => {
-          if (f.id === activeFloorId) return { ...f, ppm: ppm, height: wallHeightInMeters };
-          return f;
+          const updatedWalls = f.walls.map((w: any) => {
+              const wLenPx = Math.hypot(w.coords.x2 - w.coords.x1, w.coords.y2 - w.coords.y1);
+              return {
+                  ...w,
+                  length: wLenPx / newPpm,
+                  height: newHeightInMeters 
+              };
+          });
+          return { ...f, ppm: newPpm, height: newHeightInMeters, walls: updatedWalls };
       }));
-
-      setCalibrationModal(false); 
-      setDrawingMode('wall');
-      setCalibLinePixels(null); 
   };
 
   const handleGenerateWallsOnly = () => {
-      if (!activeFloor || activeFloor.markedPoints.length < 3 || !pixelsPerMeter) return;
+      if (!activeFloor || activeFloor.markedPoints.length < 3) return;
       
+      let currentPpm = pixelsPerMeter;
+      // Ако потребителят не е калибрирал ръчно предварително, задаваме базов мащаб
+      if (!currentPpm) {
+          currentPpm = 50; 
+          setPixelsPerMeter(currentPpm);
+          setFloors(prev => prev.map(f => f.id === activeFloorId ? { ...f, ppm: currentPpm } : f));
+      }
+
       const points = activeFloor.markedPoints;
-      const wallHeightInMeters = activeFloor.height || globalWallHeight;
+      const wallHeightInMeters = Number(activeFloor.height) || Number(globalWallHeight) || 2.80;
       const newWalls: any[] = [];
       
       for (let i = 0; i < points.length; i++) {
           const p1 = points[i];
           const p2 = points[(i + 1) % points.length];
           const lengthInPixels = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+          if (lengthInPixels < 5) continue; // Защита от нулеви стени
+
           const wallId = `wall-auto-${generateUniqueId()}`;
           const displayId = getWallLetter(activeFloor.walls.length + newWalls.length);
 
           newWalls.push({
-              id: wallId, displayId: displayId, length: lengthInPixels / pixelsPerMeter, height: wallHeightInMeters, type: 'Външна', cutouts: [], coords: { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y }
+              id: wallId, displayId: displayId, length: lengthInPixels / currentPpm, height: wallHeightInMeters, type: 'Външна', cutouts: [], coords: { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y },
+              rows: [], stats: { aFull: 0, aHalf: 0, bFull: 0, bHalf: 0, custom: 0, totalAreaUsed: 0 } 
           });
       }
       
@@ -711,35 +707,53 @@ export default function Calculator() {
                   strokeWidth: 6, fill: strokeColor, stroke: strokeColor, originX: 'center', originY: 'center', selectable: false, evented: false, strokeLineCap: 'round', customId: w.id
               });
               fabricCanvas.current.add(line);
+
+              const cx = (w.coords.x1 + w.coords.x2) / 2;
+              const cy = (w.coords.y1 + w.coords.y2) / 2;
+              const text = new fabric.Text(w.displayId, {
+                  left: cx, top: cy, fontSize: 16, fontWeight: 'bold', fill: '#0f172a',
+                  backgroundColor: 'rgba(255, 255, 255, 0.85)',
+                  originX: 'center', originY: 'center', selectable: false, evented: false,
+                  customId: w.id, customType: 'wall-label'
+              });
+              fabricCanvas.current.add(text);
           });
           fabricCanvas.current.renderAll();
       }
       setDrawingMode('wall');
       
-      // 4. СИГНАЛНО СЪОБЩЕНИЕ
-      alert('Външните стени бяха очертани успешно по контура!\n\nСИГНАЛНО СЪОБЩЕНИЕ:\nПреди да преминете към изграждане на 3D Модел, моля уверете се, че всички размери, генерирани от калкулатора по време на чертане, отговарят на размерите, описани във вашия архитектурен проект. При нужда ги коригирайте ръчно от списъка с елементи!\n\nВече можете да начертаете вътрешните стени.');
+      // 4. СИГНАЛНО СЪОБЩЕНИЕ ЗА НОВИЯ ПРОЦЕС
+      alert('Контурът е очертан успешно!\n\nВАЖНА СТЪПКА (ГЛОБАЛНО КАЛИБРИРАНЕ):\nЗа да зададете точния мащаб на вашата сграда, моля кликнете върху дължината на най-дългата стена в "Списък Елементи" (вляво) и въведете реалния ѝ размер. Системата автоматично ще преизчисли всички останали стени перфектно пропорционално!');
   };
 
   const getActiveWalls = () => floors.find(f => f.id === activeFloorId)?.walls || [];
 
-  // --- ВЪРНАТА СТАРА ЛОГИКА ЗА ПОДРЕЖДАНЕ НА ПАНЕЛИТЕ ---
+  // --- ВЪРНАТА СТАРА ЛОГИКА ЗА ПОДРЕЖДАНЕ НА ПАНЕЛИТЕ + СИГУРНОСТ ---
   const optimizeWallCore = (wallLengthMeters: number, wallHeightMeters: number, wall: any, isHorizontal: boolean) => {
+    // ЗАЩИТА: Гарантирано конвертиране до числа и предотвратяване на NaN
+    const safeLength = Number(wallLengthMeters) || 0;
+    const safeHeight = Number(wallHeightMeters) || 0;
+
     let minAreaWaste = Infinity;
     let bestRowsData: any[] = [];
     let bestStats = null;
 
+    if (safeLength <= 0 || safeHeight <= 0) {
+        return { ...wall, letter: wall.displayId, length: safeLength, height: safeHeight, rows: [], stats: { aFull: 0, aHalf: 0, bFull: 0, bHalf: 0, custom: 0, totalAreaUsed: 0 }, orientation: isHorizontal ? 'Хор' : 'Верт' };
+    }
+
     const pA = isHorizontal ? { ...PANEL_A, w: PANEL_A.h, h: PANEL_A.w } : PANEL_A;
     const pB = isHorizontal ? { ...PANEL_B, w: PANEL_B.h, h: PANEL_B.w } : PANEL_B;
 
-    const maxRowsA = Math.ceil(wallHeightMeters / pA.h) + 1;
-    const maxRowsB = Math.ceil(wallHeightMeters / pB.h) + 1;
+    const maxRowsA = Math.ceil(safeHeight / pA.h) + 1;
+    const maxRowsB = Math.ceil(safeHeight / pB.h) + 1;
 
     for (let aRows = 0; aRows <= maxRowsA; aRows++) {
       for (let bRows = 0; bRows <= maxRowsB; bRows++) {
         if (aRows === 0 && bRows === 0) continue;
         let currentTotalHeight = (aRows * pA.h) + (bRows * pB.h);
         
-        if (currentTotalHeight >= wallHeightMeters) {
+        if (currentTotalHeight >= safeHeight) {
           let sequence = [];
           let tempA = aRows, tempB = bRows;
           while (tempA > 0 || tempB > 0) {
@@ -751,14 +765,14 @@ export default function Calculator() {
           let stats = { aFull: 0, aHalf: 0, bFull: 0, bHalf: 0, custom: 0, totalAreaUsed: 0 };
 
           sequence.forEach((panel, index) => {
-            let remainingW = wallLengthMeters;
+            let remainingW = safeLength;
             let isEven = index % 2 !== 0;
             let rowPanels = [];
             
             let isLastRow = index === sequence.length - 1;
             let actualRowHeight = panel.h;
-            if (isLastRow && currentTotalHeight > wallHeightMeters) {
-               actualRowHeight = panel.h - (currentTotalHeight - wallHeightMeters);
+            if (isLastRow && currentTotalHeight > safeHeight) {
+               actualRowHeight = panel.h - (currentTotalHeight - safeHeight);
             }
 
             if (isEven) {
@@ -784,7 +798,7 @@ export default function Calculator() {
             currentRowsData.push({ panels: rowPanels, height: actualRowHeight, origHeight: panel.h });
           });
 
-          let waste = stats.totalAreaUsed - (wallLengthMeters * wallHeightMeters);
+          let waste = stats.totalAreaUsed - (safeLength * safeHeight);
           if (waste < minAreaWaste) {
             minAreaWaste = waste; bestRowsData = currentRowsData; bestStats = stats;
           }
@@ -793,7 +807,7 @@ export default function Calculator() {
     }
 
     if (!bestStats) bestStats = { aFull: 0, aHalf: 0, bFull: 0, bHalf: 0, custom: 0, totalAreaUsed: Infinity };
-    return { ...wall, letter: wall.displayId, length: wallLengthMeters, height: wallHeightMeters, rows: bestRowsData.reverse(), stats: bestStats, orientation: isHorizontal ? 'Хор' : 'Верт' };
+    return { ...wall, letter: wall.displayId, length: safeLength, height: safeHeight, rows: bestRowsData.reverse(), stats: bestStats, orientation: isHorizontal ? 'Хор' : 'Верт' };
   };
 
   const optimizeWall = (length: number, height: number, wall: any) => {
@@ -803,6 +817,10 @@ export default function Calculator() {
   };
 
   const handleCalculateProject = () => {
+    if (!window.confirm("ВНИМАНИЕ:\nПреди да изградите 3D модела, е необходимо да сверите и при необходимост да редактирате данните от дължините на всички стени с тези от вашия архитектурен проект!\n\nПотвърждавате ли, че размерите са точни?")) {
+        return;
+    }
+
     let projectWalls: any[] = [];
     let globalStats = { aFull: 0, aHalf: 0, bFull: 0, bHalf: 0, custom: 0, totalAreaUsed: 0 };
     
@@ -810,99 +828,69 @@ export default function Calculator() {
     let currentElevation = 0;
 
     const floorCenters: Record<string, {cx: number, cy: number, ppm: number}> = {};
-    floors.forEach(f => {
-        const extWalls = f.walls.filter((w:any) => w.type === 'Външна');
+    let baseCx = 400, baseCy = 300;
+    
+    // Взимаме центъра от Първия етаж, за да подравним всички следващи етажи спрямо него
+    if (floors.length > 0) {
+        const f1 = floors[0];
+        const extWalls = f1.walls.filter((w:any) => w.type === 'Външна');
+        const targetWalls = extWalls.length > 0 ? extWalls : f1.walls;
         let fMinX = Infinity, fMaxX = -Infinity, fMinY = Infinity, fMaxY = -Infinity;
-        const targetWalls = extWalls.length > 0 ? extWalls : f.walls;
         targetWalls.forEach((w:any) => {
             fMinX = Math.min(fMinX, w.coords.x1, w.coords.x2);
             fMaxX = Math.max(fMaxX, w.coords.x1, w.coords.x2);
             fMinY = Math.min(fMinY, w.coords.y1, w.coords.y2);
             fMaxY = Math.max(fMaxY, w.coords.y1, w.coords.y2);
         });
+        if (fMinX !== Infinity) {
+            baseCx = (fMinX + fMaxX) / 2;
+            baseCy = (fMinY + fMaxY) / 2;
+        }
+    }
+
+    floors.forEach(f => {
         floorCenters[f.id] = {
-            cx: fMinX === Infinity ? 0 : (fMinX + fMaxX) / 2,
-            cy: fMinY === Infinity ? 0 : (fMinY + fMaxY) / 2,
+            cx: baseCx,
+            cy: baseCy,
             ppm: f.ppm || 50
         };
     });
 
     floors.forEach((floor, fIndex) => {
-        let cornerAdjustments: Record<string, number> = {};
-        const extWalls = floor.walls.filter((w: any) => w.type === 'Външна');
-        
-        for(let i=0; i<extWalls.length; i++) {
-            for(let j=i+1; j<extWalls.length; j++) {
-                const w1 = extWalls[i]; const w2 = extWalls[j];
-                const pts1 = [{x: w1.coords.x1, y: w1.coords.y1}, {x: w1.coords.x2, y: w1.coords.y2}];
-                const pts2 = [{x: w2.coords.x1, y: w2.coords.y1}, {x: w2.coords.x2, y: w2.coords.y2}];
-
-                let connected = false;
-                for(let p1 of pts1) {
-                    for(let p2 of pts2) {
-                        if (Math.hypot(p1.x - p2.x, p1.y - p2.y) < 5) connected = true;
-                    }
-                }
-                if (connected) { cornerAdjustments[w1.id] = (cornerAdjustments[w1.id] || 0) + 0.10; }
-            }
-        }
-
         floor.walls.forEach((wall: any) => {
-            const fData = floorCenters[floor.id];
-            const mX1 = (wall.coords.x1 - fData.cx) / fData.ppm;
-            const mY1 = (wall.coords.y1 - fData.cy) / fData.ppm;
-            const mX2 = (wall.coords.x2 - fData.cx) / fData.ppm;
-            const mY2 = (wall.coords.y2 - fData.cy) / fData.ppm;
+            const fData = floorCenters[floor.id] || { cx: baseCx, cy: baseCy, ppm: 50 };
+            const ppm = Number(fData.ppm) || 50;
+            const mX1 = (Number(wall.coords.x1) - Number(fData.cx)) / ppm;
+            const mY1 = (Number(wall.coords.y1) - Number(fData.cy)) / ppm;
+            const mX2 = (Number(wall.coords.x2) - Number(fData.cx)) / ppm;
+            const mY2 = (Number(wall.coords.y2) - Number(fData.cy)) / ppm;
 
             allProcessedWalls.push({
                 ...wall,
                 floorIndex: fIndex,
-                structuralLength: wall.type === 'Външна' ? wall.length + (cornerAdjustments[wall.id] || 0) : wall.length,
+                structuralLength: Number(wall.length) || 0,
                 baseElevation: currentElevation,
-                merged: false,
                 mCoords: { x1: mX1, y1: mY1, x2: mX2, y2: mY2 }
             });
         });
         
-        currentElevation += (Number(floor.height) || Number(globalWallHeight));
+        currentElevation += (Number(floor.height) || Number(globalWallHeight) || 2.80);
     });
 
+    // БЕЗ ВЕРТИКАЛНО СЛИВАНЕ (ОПРАВЯ БЪГА С ИЗЧЕЗВАЩИТЕ СТЕНИ НА ВТОРИЯ ЕТАЖ)
     for (let i = 0; i < allProcessedWalls.length; i++) {
         let w1 = allProcessedWalls[i];
-        if (w1.merged) continue;
 
-        let totalMergedHeight = w1.height;
-        let mergedFloors = [w1.floorIndex];
-        let lastMergedWall = w1; 
-
-        if (w1.type === 'Външна') {
-            for (let j = i + 1; j < allProcessedWalls.length; j++) {
-                let w2 = allProcessedWalls[j];
-                
-                if (w2.merged || w2.type !== 'Външна' || w2.floorIndex !== lastMergedWall.floorIndex + 1) continue;
-
-                const d1 = Math.hypot(lastMergedWall.mCoords.x1 - w2.mCoords.x1, lastMergedWall.mCoords.y1 - w2.mCoords.y1);
-                const d2 = Math.hypot(lastMergedWall.mCoords.x2 - w2.mCoords.x2, lastMergedWall.mCoords.y2 - w2.mCoords.y2);
-                const d3 = Math.hypot(lastMergedWall.mCoords.x1 - w2.mCoords.x2, lastMergedWall.mCoords.y1 - w2.mCoords.y2); 
-                const d4 = Math.hypot(lastMergedWall.mCoords.x2 - w2.mCoords.x1, lastMergedWall.mCoords.y2 - w2.mCoords.y1);
-
-                if ((d1 < 0.2 && d2 < 0.2) || (d3 < 0.2 && d4 < 0.2)) {
-                    totalMergedHeight += w2.height;
-                    w2.merged = true;
-                    mergedFloors.push(w2.floorIndex);
-                    lastMergedWall = w2; 
-                }
-            }
-        }
-
-        const optimized = optimizeWall(w1.structuralLength, totalMergedHeight, w1);
+        const safeLength = Number(w1.structuralLength) || 0.1;
+        const wallHeight = Number(w1.height) || 2.80;
+        const optimized = optimizeWall(safeLength, wallHeight, w1);
         
-        if (optimized && optimized.stats) {
+        if (optimized && optimized.stats && optimized.stats.totalAreaUsed !== Infinity) {
             projectWalls.push({
                 ...optimized, 
-                floorName: `Етаж ${w1.floorIndex + 1}${mergedFloors.length > 1 ? `-${mergedFloors[mergedFloors.length-1]+1}` : ''}`, 
-                elevation: w1.baseElevation, 
-                floorId: floors[w1.floorIndex].id 
+                floorName: `Етаж ${w1.floorIndex + 1}`, 
+                elevation: Number(w1.baseElevation) || 0, 
+                floorId: floors[w1.floorIndex].id
             });
             globalStats.aFull += optimized.stats.aFull || 0;
             globalStats.aHalf += optimized.stats.aHalf || 0;
@@ -940,29 +928,32 @@ export default function Calculator() {
     setOrderStatus('sending');
 
     try {
+      const optimizedWallsToSave = projectResult?.walls || [];
+      
       const payload = {
         clientName, clientPhone, clientLocation, clientEmail,
         totalArea: projectResult?.globalStats.totalAreaUsed || 0,
-        floorsData: floors.map(f => ({
-            floorId: f.id,
-            floorName: f.name,
-            walls: f.walls, // 1 & 2. Пращаме оригиналните стени (външни и вътрешни), за да не изчезват!
-            optimizedWalls: projectResult?.walls.filter((w: any) => w.floorId === f.id) || [],
-            ppm: f.ppm,
-            bgConfig: { x: f.bgOffsetX, y: f.bgOffsetY, scaleX: f.bgScaleX, scaleY: f.bgScaleY },
-            underlay: f.underlay // 5. Задължително прикачаме подложката!
-        })),
-        cadData: floors.flatMap(f => f.walls) // Изпращаме масива с оригиналните стени
+        floorsData: floors.map(f => {
+            const currentFloorOptimizedWalls = optimizedWallsToSave.filter((w: any) => w.floorId === f.id);
+            return {
+                floorId: f.id,
+                floorName: f.name,
+                walls: currentFloorOptimizedWalls.length > 0 ? currentFloorOptimizedWalls : f.walls, 
+                optimizedWalls: currentFloorOptimizedWalls,
+                ppm: f.ppm,
+                bgConfig: { x: f.bgOffsetX, y: f.bgOffsetY, scaleX: f.bgScaleX, scaleY: f.bgScaleY },
+                underlay: f.underlay
+            };
+        }),
+        cadData: optimizedWallsToSave 
       };
 
-      // 1. Изпращаме заявката за запазване в базата
       await fetch('/api/quotes', {
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
         body: JSON.stringify(payload)
       });
 
-      // 2. Генерираме HTML за техническата спецификация
       let specHtml = `<h3>Техническа спецификация:</h3>`;
       specHtml += `<p><strong>Общо панели:</strong> ${(projectResult?.globalStats.aFull || 0) + (projectResult?.globalStats.bFull || 0)} бр.</p>`;
       specHtml += `<p><strong>Обща квадратура:</strong> ${payload.totalArea.toFixed(2)} м²</p>`;
@@ -982,7 +973,6 @@ export default function Calculator() {
       });
       specHtml += `</ul>`;
 
-      // Имейл до клиента (Автоматичен отговор)
       try {
         await fetch('/api/send-email', {
           method: 'POST',
@@ -999,7 +989,6 @@ export default function Calculator() {
         console.error("Грешка при изпращане на автоматичния отговор: ", err);
       }
 
-      // 3. Формираме FormData точно както в контактната форма, за да работи изпращането до office@biozid.bg!
       const formData = new FormData();
       formData.append('name', clientName);
       formData.append('phone', clientPhone);
@@ -1046,32 +1035,42 @@ export default function Calculator() {
   };
 
   const Scene3D = ({ project, viewFloor }: any) => {
-    const walls = viewFloor === 'all' ? project.walls : project.walls.filter((w: any) => w.floorId === viewFloor);
-    const baseFloors = viewFloor === 'all' ? project.floorsData : project.floorsData.filter((f: any) => f.id === viewFloor);
+    // ВАЖНО: Тъй като вече не сливаме стените, филтрирането е изключително просто
+    const walls = viewFloor === 'all' 
+        ? project.walls 
+        : project.walls.filter((w: any) => w.floorId === viewFloor);
+
+    const baseFloors = viewFloor === 'all' 
+        ? project.floorsData 
+        : project.floorsData.filter((f: any) => f.id === viewFloor);
     
     const floorCenters: Record<string, {cx: number, cy: number, ppm: number}> = {};
-    project.floorsData.forEach((fl: any) => {
-        const floorWalls = project.walls.filter((w: any) => w.floorId === fl.id);
+    let baseCx = 400, baseCy = 300;
+    
+    if (project.floorsData.length > 0) {
+        const f1 = project.floorsData[0];
+        const floorWalls = project.walls.filter((w: any) => w.floorId === f1.id);
         const extWalls = floorWalls.filter((w:any) => w.type === 'Външна');
-        let fMinX = Infinity, fMaxX = -Infinity, fMinY = Infinity, fMaxY = -Infinity;
         const targetWalls = extWalls.length > 0 ? extWalls : floorWalls;
-
+        let fMinX = Infinity, fMaxX = -Infinity, fMinY = Infinity, fMaxY = -Infinity;
         targetWalls.forEach((w: any) => {
             fMinX = Math.min(fMinX, w.coords.x1, w.coords.x2);
             fMaxX = Math.max(fMaxX, w.coords.x1, w.coords.x2);
             fMinY = Math.min(fMinY, w.coords.y1, w.coords.y2);
             fMaxY = Math.max(fMaxY, w.coords.y1, w.coords.y2);
         });
+        if (fMinX !== Infinity) {
+            baseCx = (fMinX + fMaxX) / 2;
+            baseCy = (fMinY + fMaxY) / 2;
+        }
+    }
 
-        floorCenters[fl.id] = {
-            cx: fMinX === Infinity ? 0 : (fMinX + fMaxX) / 2,
-            cy: fMinY === Infinity ? 0 : (fMinY + fMaxY) / 2,
-            ppm: fl.ppm || 50
-        };
+    project.floorsData.forEach((fl: any) => {
+        floorCenters[fl.id] = { cx: baseCx, cy: baseCy, ppm: fl.ppm || 50 };
     });
 
     return (
-      <Canvas gl={{ preserveDrawingBuffer: true }} camera={{ position: [0, 20, 30], fov: 45 }} className="print:w-full print:h-[500px]">
+      <Canvas gl={{ preserveDrawingBuffer: true }} camera={{ position: [0, 20, 30], fov: 45 }} className="print:hidden">
         <ambientLight intensity={0.7} />
         <directionalLight position={[10, 30, 10]} intensity={1.5} castShadow />
         <OrbitControls enablePan={true} enableZoom={true} enableRotate={true} />
@@ -1085,10 +1084,10 @@ export default function Calculator() {
                 const fc = floorCenters[fl.id];
 
                 floorWalls.forEach((w: any) => {
-                    const mX1 = (w.coords.x1 - fc.cx) / fc.ppm;
-                    const mY1 = (w.coords.y1 - fc.cy) / fc.ppm;
-                    const mX2 = (w.coords.x2 - fc.cx) / fc.ppm;
-                    const mY2 = (w.coords.y2 - fc.cy) / fc.ppm;
+                    const mX1 = (Number(w.coords.x1) - fc.cx) / fc.ppm;
+                    const mY1 = (Number(w.coords.y1) - fc.cy) / fc.ppm;
+                    const mX2 = (Number(w.coords.x2) - fc.cx) / fc.ppm;
+                    const mY2 = (Number(w.coords.y2) - fc.cy) / fc.ppm;
                     mMinX = Math.min(mMinX, mX1, mX2);
                     mMaxX = Math.max(mMaxX, mX1, mX2);
                     mMinY = Math.min(mMinY, mY1, mY2);
@@ -1115,13 +1114,13 @@ export default function Calculator() {
 
             {walls.map((wall: any) => {
                 const fc = floorCenters[wall.floorId];
-                const cx = (wall.coords.x1 + wall.coords.x2) / 2;
-                const cy = (wall.coords.y1 + wall.coords.y2) / 2;
+                const cx = (Number(wall.coords.x1) + Number(wall.coords.x2)) / 2;
+                const cy = (Number(wall.coords.y1) + Number(wall.coords.y2)) / 2;
                 const posX = (cx - fc.cx) / fc.ppm;
                 const posZ = (cy - fc.cy) / fc.ppm;
                 
-                const dx = wall.coords.x2 - wall.coords.x1;
-                const dy = wall.coords.y2 - wall.coords.y1;
+                const dx = Number(wall.coords.x2) - Number(wall.coords.x1);
+                const dy = Number(wall.coords.y2) - Number(wall.coords.y1);
                 const rotY = -Math.atan2(dy, dx);
 
                 return (
@@ -1189,9 +1188,12 @@ export default function Calculator() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {floors.map(f => (
-                    <button key={f.id} onClick={() => { setActiveFloorId(f.id); setViewMode('2D'); }} className={`px-3 py-2 text-[10px] font-bold rounded border transition ${activeFloorId === f.id && viewMode === '2D' ? 'bg-teal-600 text-white border-teal-700' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>
-                      {f.name}
-                    </button>
+                    <div key={f.id} className="relative group">
+                        <button onClick={() => { setActiveFloorId(f.id); setViewMode('2D'); }} className={`px-3 py-2 text-[10px] font-bold rounded border transition ${activeFloorId === f.id && viewMode === '2D' ? 'bg-teal-600 text-white border-teal-700' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'}`}>
+                          {f.name}
+                        </button>
+                        <button onClick={() => handleDeleteFloor(f.id)} className="absolute -top-2 -right-2 bg-rose-500 text-white w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow-sm border border-white">X</button>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -1246,17 +1248,17 @@ export default function Calculator() {
 
                       {!pixelsPerMeter ? (
                           <div className="bg-orange-50 border-2 border-orange-400 p-4 rounded-xl shadow-inner mt-2">
-                              <strong className="text-orange-900 uppercase tracking-wide text-xs block mb-2"> Ръководство за калибриране:</strong>
-                              <ol className="list-decimal pl-4 text-xs text-orange-800 leading-relaxed font-medium space-y-1">
-                                  <li>Изберете инструмента <strong>"Калибратор"</strong> по-долу.</li>
-                                  <li>Начертайте линия върху стена (или оразмерителна линия) на чертежа, чиято реална дължина знаете.</li>
-                                  <li>Въведете точния размер в метри или сантиметри в прозореца, който ще се появи.</li>
+                              <strong className="text-orange-900 uppercase tracking-wide text-xs block mb-2"> Ръководство за работа:</strong>
+                              <ol className="list-decimal pl-4 text-xs text-orange-800 leading-relaxed font-medium space-y-2">
+                                  <li><strong>Очертаване:</strong> Изберете "Маркирай Контур" и очертайте ъглите.</li>
+                                  <li><strong>Автоматично:</strong> Натиснете "Очертай автоматично контур".</li>
+                                  <li><strong>Калибриране:</strong> В "Списък Елементи" кликнете върху дължината на най-дългата стена и въведете реалния ѝ размер.</li>
                               </ol>
                           </div>
                       ) : (
                           <div className="bg-teal-50 border border-teal-200 p-3 rounded text-xs text-teal-800 leading-relaxed shadow-inner mt-2">
                               <strong>Мащабът е зададен!</strong><br/>
-                              Може да продължите с чертането.
+                              Може да продължите с чертането на вътрешни стени.
                           </div>
                       )}
 
@@ -1268,10 +1270,7 @@ export default function Calculator() {
                               <button onClick={() => setWallType('Вътрешна')} className={`flex-1 py-1.5 text-[10px] font-bold uppercase rounded transition ${wallType === 'Вътрешна' ? 'bg-white shadow text-slate-700' : 'text-slate-500 hover:text-slate-700'}`}>Вътрешна</button>
                           </div>
 
-                          <div className="grid grid-cols-2 gap-2 mb-2">
-                              <button onClick={() => setDrawingMode(drawingMode === 'calibrate' ? 'none' : 'calibrate')} className={`p-2 text-[10px] font-bold uppercase rounded border transition ${drawingMode === 'calibrate' ? 'bg-indigo-600 text-white border-indigo-700 shadow-inner' : 'bg-white text-slate-700 hover:bg-indigo-50 border-slate-200'}`}>
-                                  {drawingMode === 'calibrate' ? 'Спри' : 'Калибратор'}
-                              </button>
+                          <div className="grid grid-cols-1 gap-2 mb-2">
                               <button onClick={() => setDrawingMode(drawingMode === 'wall' ? 'none' : 'wall')} className={`p-2 text-[10px] font-bold uppercase rounded border transition ${drawingMode === 'wall' ? 'bg-teal-600 text-white border-teal-700 shadow-inner' : 'bg-white text-slate-700 hover:bg-teal-50 border-slate-200'}`}>
                                   {drawingMode === 'wall' ? 'Спри' : 'Чертай Стена'}
                               </button>
@@ -1279,25 +1278,39 @@ export default function Calculator() {
 
                           <div className="grid grid-cols-1 gap-2 mb-2">
                               <button onClick={() => setDrawingMode(drawingMode === 'point' ? 'none' : 'point')} className={`p-2 text-[10px] font-bold uppercase rounded border transition ${drawingMode === 'point' ? 'bg-rose-500 text-white border-rose-600 shadow-inner' : 'bg-white text-slate-700 hover:bg-rose-50 border-slate-200'}`}>
-                                  {drawingMode === 'point' ? 'Спри' : 'Маркирай Контур (Точки)'}
+                                  {drawingMode === 'point' ? 'Спри' : 'Маркирай Контур '}
                               </button>
-                          </div>
-
-                          <div className="bg-blue-50 border border-blue-200 p-2 mt-2 rounded text-[10px] text-blue-800 leading-relaxed shadow-sm">
-                              <strong>Важно:</strong> При чертане по подложката, в зоните с прозорци и врати, моля начертайте стените <strong>цялостно и без прекъсване</strong>. Това е нужно за правилно изчисление.
                           </div>
                           
                           {activeFloor && activeFloor.markedPoints.length >= 2 && (
-                             <button onClick={() => {
-                                 if (pixelsPerMeter) handleGenerateWallsOnly();
-                                 else alert('Моля, първо използвайте калибратора, за да зададете мащаб!'); 
-                             }} className="w-full mt-2 bg-slate-900 text-white p-2 rounded text-[10px] font-bold uppercase hover:bg-teal-600 transition shadow">
+                             <button onClick={handleGenerateWallsOnly} className="w-full mt-2 bg-slate-900 text-white p-2 rounded text-[10px] font-bold uppercase hover:bg-teal-600 transition shadow">
                                  Очертай автоматично контур
                              </button>
                           )}
                       </div>
 
-                      <div className="flex-1 flex flex-col min-h-0">
+                      <div className="flex-1 flex flex-col min-h-0 pt-4">
+                          {activeFloor && (
+                            <div className="mb-4 flex items-center justify-between bg-teal-50 p-3 rounded border border-teal-100 shadow-inner">
+                                <span className="text-[10px] font-bold uppercase text-teal-800">Височина на стени {activeFloor.name} (м):</span>
+                                <input type="number" step="0.05" value={activeFloor.height} 
+                                  onChange={(e) => {
+                                      const val = parseFloat(e.target.value) || 2.8;
+                                      setFloors(prev => prev.map(f => {
+                                          if (f.id === activeFloorId) {
+                                              return { 
+                                                  ...f, 
+                                                  height: val,
+                                                  walls: f.walls.map((w: any) => ({ ...w, height: val })) 
+                                              };
+                                          }
+                                          return f;
+                                      }));
+                                  }} 
+                                  className="w-16 p-1 text-center border border-teal-300 rounded text-xs font-bold" />
+                            </div>
+                          )}
+
                           <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Списък Елементи ({getActiveWalls().length})</h3>
                           <ul className="space-y-2 overflow-y-auto pr-1 flex-1">
                               {getActiveWalls().map((w: any) => {
@@ -1373,7 +1386,7 @@ export default function Calculator() {
 
                               <div className="relative h-[450px] border-b border-slate-200 print:hidden shrink-0">
                                   <div className="absolute top-4 left-4 z-10 bg-white/95 backdrop-blur p-5 rounded-xl shadow-xl border border-slate-200 min-w-[260px]">
-                                      <h3 className="text-[10px] font-bold uppercase tracking-widest text-teal-600 border-b border-slate-100 pb-3 mb-3">Обща Спецификация (Всички етажи)</h3>
+                                      <h3 className="text-[10px] font-bold uppercase tracking-widest text-teal-600 border-b border-slate-100 pb-3 mb-3">Обща Спецификация</h3>
                                       <div className="space-y-2 text-xs">
                                           <div className="flex justify-between"><span className="text-slate-500">Панели общо:</span><span className="font-bold">{projectResult.globalStats.aFull + projectResult.globalStats.bFull} бр.</span></div>
                                           <div className="flex justify-between pt-2 border-t border-slate-200"><span className="text-slate-600 font-bold uppercase text-[10px]">Обща Квадратура:</span><span className="font-black text-teal-600 text-sm">{projectResult.globalStats.totalAreaUsed.toFixed(1)} м²</span></div>
@@ -1383,12 +1396,34 @@ export default function Calculator() {
                                   <Scene3D project={projectResult} viewFloor={'all'} />
                               </div>
 
-                              {/* СКРИТ БЛОК ЗА ПЕЧАТ (PRINT ONLY) - ПЪЛНА ПРОИЗВОДСТВЕНА СПЕЦИФИКАЦИЯ БЕЗ 3D МОДЕЛ */}
-                              <div className="hidden print:block w-full text-black mt-8">
-                                  <h1 className="text-3xl font-bold mb-6 text-center border-b-4 border-black pb-4">ОФИЦИАЛНА ПРОИЗВОДСТВЕНА СПЕЦИФИКАЦИЯ БИОЗИД</h1>
-                                  <div className="mb-8 text-lg">
-                                      <p><strong>Общо панели за целия проект:</strong> {projectResult.globalStats.aFull + projectResult.globalStats.bFull} бр.</p>
-                                      <p><strong>Обща квадратура на панелите:</strong> {projectResult.globalStats.totalAreaUsed.toFixed(2)} м²</p>
+                              {/* БЛОК ЗА ПЕЧАТ (ЗАДАНИЕ 4, 5, 6) */}
+                              <div className="hidden print:block w-full text-black">
+                                  {/* ГАЛЕРИЯ НА ПОДЛОЖКИ (ЗАДАНИЕ 4) */}
+                                  <div className="p-8 border-b-2 border-black mb-8">
+                                      <h2 className="text-lg font-bold uppercase mb-4">Галерия на прикачените чертежи (подложки):</h2>
+                                      <div className="grid grid-cols-3 gap-4">
+                                          {projectResult.floorsData.map((f: any) => f.underlay && (
+                                              <div key={`gallery-${f.id}`} className="border border-slate-300 p-2 text-center">
+                                                  <img src={f.underlay} alt={f.name} className="max-h-48 mx-auto object-contain mb-2" />
+                                                  <p className="text-[10px] font-bold uppercase">{f.name}</p>
+                                              </div>
+                                          ))}
+                                      </div>
+                                  </div>
+
+                                  <h1 className="text-3xl font-bold mb-6 text-center border-b-4 border-black pb-4 print:break-before-page" style={{ breakBefore: 'page' }}>
+                                      ОФИЦИАЛНА ПРОИЗВОДСТВЕНА СПЕЦИФИКАЦИЯ БИОЗИД
+                                  </h1>
+
+                                  <div className="mb-8 px-8 text-lg flex justify-between items-end">
+                                      <div>
+                                          <p><strong>Общо панели:</strong> {projectResult.globalStats.aFull + projectResult.globalStats.bFull} бр.</p>
+                                          <p><strong>Обща квадратура:</strong> {projectResult.globalStats.totalAreaUsed.toFixed(2)} м²</p>
+                                      </div>
+                                      <div className="text-right text-sm">
+                                          <p>Клиент: {clientName}</p>
+                                          <p>Дата: {new Date().toLocaleDateString('bg-BG')}</p>
+                                      </div>
                                   </div>
                                   
                                   {projectResult.floorsData.map((f: any) => {
@@ -1397,7 +1432,7 @@ export default function Calculator() {
                                       
                                       let floorPanelsA = 0, floorPanelsB = 0, floorCustom = 0, floorArea = 0;
                                       floorWalls.forEach((w:any) => {
-                                          if (w.stats) {
+                                          if (w.stats) { 
                                               floorPanelsA += (w.stats.aFull || 0);
                                               floorPanelsB += (w.stats.bFull || 0);
                                               floorCustom += (w.stats.custom || 0);
@@ -1406,45 +1441,45 @@ export default function Calculator() {
                                       });
 
                                       return (
-                                          <div key={`print-floor-${f.id}`} className="mb-12 break-inside-avoid">
-                                              <h2 className="text-2xl font-bold mb-4 bg-slate-200 p-3 border border-black">{f.name}</h2>
+                                          <div key={`print-floor-${f.id}`} className="px-8 mb-12 break-inside-avoid">
+                                              <h2 className="text-xl font-bold mb-4 bg-slate-100 p-3 border border-black uppercase">{f.name}</h2>
                                               
-                                              <div className="flex gap-4 mb-4 break-inside-avoid">
-                                                  {f.underlay && (
-                                                      <div className="w-1/2 border border-black p-2">
-                                                          <p className="text-[12px] font-bold mb-2 uppercase">Оригинална подложка (чертеж):</p>
-                                                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                          <img src={f.underlay} alt={f.name} className="w-full h-auto object-contain max-h-[400px]" />
-                                                      </div>
-                                                  )}
-                                                  <div className="flex-1 border border-black p-6 text-base bg-slate-50">
-                                                      <p className="mb-2"><strong>Брой стени:</strong> {floorWalls.length}</p>
-                                                      <p className="mb-2"><strong>Панели Тип А (2.50x1.25):</strong> {floorPanelsA} бр.</p>
-                                                      <p className="mb-2"><strong>Панели Тип Б (2.44x1.44):</strong> {floorPanelsB} бр.</p>
-                                                      <p className="mb-2"><strong>Изрязани парчета:</strong> {floorCustom} бр.</p>
-                                                      <p className="mb-2 border-t border-slate-300 pt-2"><strong>Площ панели за етажа:</strong> {floorArea.toFixed(2)} м²</p>
+                                              <div className="grid grid-cols-2 gap-6 mb-6">
+                                                  <div className="border border-black p-4 bg-slate-50">
+                                                      <p className="font-bold text-sm mb-2 border-b pb-1">ДАННИ ЗА ЕТАЖА:</p>
+                                                      <p className="text-sm">Брой стени: <strong>{floorWalls.length}</strong></p>
+                                                      <p className="text-sm">Височина на стените: <strong>{f.height.toFixed(2)} м</strong></p>
+                                                      <p className="text-sm">Площ за етажа: <strong>{floorArea.toFixed(2)} м²</strong></p>
+                                                  </div>
+                                                  <div className="border border-black p-4 bg-slate-50">
+                                                      <p className="font-bold text-sm mb-2 border-b pb-1">СПЕЦИФИКАЦИЯ ПАНЕЛИ:</p>
+                                                      <p className="text-sm">Тип А (2.50x1.25): <strong>{floorPanelsA} бр.</strong></p>
+                                                      <p className="text-sm">Тип Б (2.44x1.44): <strong>{floorPanelsB} бр.</strong></p>
+                                                      <p className="text-sm">Изрязани (Custom): <strong>{floorCustom} бр.</strong></p>
                                                   </div>
                                               </div>
                                               
-                                              <table className="w-full text-left border-collapse border border-black text-sm break-inside-avoid">
+                                              <table className="w-full text-left border-collapse border border-black text-xs">
                                                   <thead>
-                                                      <tr className="bg-slate-100">
-                                                          <th className="border border-black p-2">Стена (ИД)</th>
+                                                      <tr className="bg-slate-200">
+                                                          <th className="border border-black p-2 w-16 text-center">Стена</th>
                                                           <th className="border border-black p-2">Тип</th>
-                                                          <th className="border border-black p-2">Дължина (м)</th>
-                                                          <th className="border border-black p-2">Височина (м)</th>
-                                                          <th className="border border-black p-2">Разбивка панели</th>
+                                                          <th className="border border-black p-2 text-center">Дължина (м)</th>
+                                                          <th className="border border-black p-2 text-center">Височина (м)</th>
+                                                          <th className="border border-black p-2">Разбивка</th>
                                                       </tr>
                                                   </thead>
                                                   <tbody>
                                                       {floorWalls.map((w: any) => (
                                                           <tr key={`print-wall-${w.id}`}>
-                                                              <td className="border border-black p-2 font-bold text-center">{w.letter}</td>
+                                                              <td className="border border-black p-2 font-bold text-center flex flex-col items-center">
+                                                                  <span>{w.letter}</span>
+                                                              </td>
                                                               <td className="border border-black p-2">{w.type}</td>
                                                               <td className="border border-black p-2 text-center">{w.length.toFixed(2)}</td>
                                                               <td className="border border-black p-2 text-center">{w.height.toFixed(2)}</td>
                                                               <td className="border border-black p-2">
-                                                                  {w.stats && `Тип А: ${w.stats.aFull} бр. | Тип Б: ${w.stats.bFull} бр. | Изрязани: ${w.stats.custom} бр.`}
+                                                                  {w.stats && `A: ${w.stats.aFull} | Б: ${w.stats.bFull} | Custom: ${w.stats.custom}`}
                                                               </td>
                                                           </tr>
                                                       ))}
@@ -1467,36 +1502,13 @@ export default function Calculator() {
       </main>
 
       <div className="print:hidden"><Footer /></div>
-
-      {calibrationModal && (
-          <div className="fixed inset-0 z-[600] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 text-slate-800 print:hidden">
-              <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl p-8 text-center border-t-4 border-indigo-500 relative">
-                  <button onClick={() => { setCalibrationModal(false); setCalibLinePixels(null); }} className="absolute top-4 right-4 text-slate-400 text-xl leading-none">&times;</button>
-                  <h2 className="font-bold text-lg mb-2">Калибриране</h2>
-                  <p className="text-[10px] text-slate-500 mb-4 bg-indigo-50 p-2 rounded border border-indigo-100">
-                      Моля, въведете реалната дължина на начертаната <span className="text-indigo-500 font-bold">ЛИЛАВА</span> линия:
-                  </p>
-                  <div className="flex flex-col gap-4 mb-6">
-                    <div className="flex flex-col gap-1 text-left">
-                        <label className="text-[10px] font-bold uppercase text-slate-400">Дължина на линията ({unit})</label>
-                        <input autoFocus type="number" value={calibLengthInput} onChange={(e) => setCalibLengthInput(e.target.value)} className="w-full bg-slate-50 p-3 rounded-lg border border-slate-200 font-bold outline-none" />
-                    </div>
-                    <div className="flex flex-col gap-1 text-left">
-                        <label className="text-[10px] font-bold uppercase text-slate-400">Височина на етажа ({unit})</label>
-                        <input type="number" value={calibHeightInput} onChange={(e) => setCalibHeightInput(e.target.value)} className="w-full bg-slate-50 p-3 rounded-lg border border-slate-200 font-bold outline-none" />
-                    </div>
-                  </div>
-                  <button onClick={handleAreaCalibrationSubmit} className="w-full bg-indigo-600 text-white p-3 rounded text-[10px] font-bold uppercase hover:bg-indigo-700 transition shadow">Приложи мащаба</button>
-              </div>
-          </div>
-      )}
       
       {isOrderModalOpen && (
         <div className="fixed inset-0 z-[500] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 text-slate-800 print:hidden">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8">
               <div className="flex justify-between items-center mb-6">
                   <h2 className="font-bold text-lg">Изпрати запитване</h2>
-                  <button onClick={() => setIsOrderModalOpen(false)} className="text-slate-400 text-2xl leading-none">&times;</button>
+                  <button onClick={() => setIsOrderModalOpen(false)} className="text-slate-400 text-2xl leading-none">X</button>
               </div>
               <div className="space-y-4 mb-6">
                 <div>
@@ -1512,7 +1524,7 @@ export default function Calculator() {
                   <input value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded text-sm font-bold outline-none" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold uppercase text-slate-400">Място</label>
+                  <label className="text-[10px] font-bold uppercase text-slate-400">Място за доставка</label>
                   <input value={clientLocation} onChange={(e) => setClientLocation(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded text-sm font-bold outline-none" />
                 </div>
               </div>

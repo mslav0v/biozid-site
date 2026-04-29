@@ -100,7 +100,7 @@ export default function CadEditor({ walls, onSave, isSaving }: CadEditorProps) {
   const handleAddPanel = (wIdx: number, autoFill: boolean = false) => {
     const updatedWalls = [...localWalls];
     const wall = updatedWalls[wIdx];
-    const targetRow = wall.rows[newPanelRow];
+    const targetRow = wall.rows ? wall.rows[newPanelRow] : undefined;
     
     if (!targetRow) return alert("Избраният ред не съществува!");
 
@@ -175,8 +175,8 @@ export default function CadEditor({ walls, onSave, isSaving }: CadEditorProps) {
     setLocalWalls(updatedWalls);
   };
 
-  const activePanelData = selectedPanel ? localWalls[selectedPanel.wIdx]?.rows[selectedPanel.rIdx]?.panels[selectedPanel.pIdx] : null;
-  const activeRowHeight = selectedPanel ? localWalls[selectedPanel.wIdx]?.rows[selectedPanel.rIdx]?.height : null;
+  const activePanelData = selectedPanel ? localWalls[selectedPanel.wIdx]?.rows?.[selectedPanel.rIdx]?.panels?.[selectedPanel.pIdx] : null;
+  const activeRowHeight = selectedPanel ? localWalls[selectedPanel.wIdx]?.rows?.[selectedPanel.rIdx]?.height : null;
 
   return (
     <div className="flex flex-col gap-4 font-sans">
@@ -212,7 +212,7 @@ export default function CadEditor({ walls, onSave, isSaving }: CadEditorProps) {
                     <div className="flex justify-between items-center">
                       <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest">Стена {wall.letter}</h3>
                       <span className="text-[10px] bg-white border border-slate-200 px-3 py-1.5 rounded text-slate-500 font-bold uppercase shadow-sm">
-                        Панели: {wall.rows.reduce((acc: number, row: any) => acc + row.panels.length, 0)}
+                        Панели: {(wall.rows || []).reduce((acc: number, row: any) => acc + (row.panels?.length || 0), 0)}
                       </span>
                     </div>
                     
@@ -261,7 +261,7 @@ export default function CadEditor({ walls, onSave, isSaving }: CadEditorProps) {
                             <div>
                               <label className="text-[9px] uppercase font-bold text-slate-400 block mb-1">Към Ред</label>
                               <select value={newPanelRow} onChange={(e) => setNewPanelRow(parseInt(e.target.value))} className="w-full bg-slate-50 border border-slate-200 rounded p-2 text-xs font-bold text-slate-700 outline-teal-500">
-                                {wall.rows.map((_: any, rIdx: number) => (
+                                {(wall.rows || []).map((_: any, rIdx: number) => (
                                   <option key={rIdx} value={rIdx}>Ред {rIdx + 1}</option>
                                 ))}
                               </select>
@@ -294,8 +294,8 @@ export default function CadEditor({ walls, onSave, isSaving }: CadEditorProps) {
                     <div className="bg-slate-50 p-5 rounded-xl border border-slate-100">
                        <h3 className="text-[11px] font-bold uppercase tracking-widest text-teal-600 border-b border-slate-200 pb-3 mb-4">Свойства на панела</h3>
                        <div className="space-y-3 text-sm">
-                          <div className="flex justify-between items-center"><span className="text-slate-500 text-xs font-bold uppercase">Ширина:</span><span className="font-black text-slate-800">{activePanelData.width.toFixed(3)} м</span></div>
-                          <div className="flex justify-between items-center"><span className="text-slate-500 text-xs font-bold uppercase">Височина:</span><span className="font-black text-slate-800">{(activePanelData.height || activeRowHeight).toFixed(3)} м</span></div>
+                          <div className="flex justify-between items-center"><span className="text-slate-500 text-xs font-bold uppercase">Ширина:</span><span className="font-black text-slate-800">{activePanelData.width?.toFixed(3) || '0.000'} м</span></div>
+                          <div className="flex justify-between items-center"><span className="text-slate-500 text-xs font-bold uppercase">Височина:</span><span className="font-black text-slate-800">{((activePanelData.height || activeRowHeight) || 0).toFixed(3)} м</span></div>
                           <div className="flex justify-between items-center"><span className="text-slate-500 text-xs font-bold uppercase">Тип сряз:</span>
                             <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${activePanelData.type === 'custom' ? 'bg-orange-100 text-orange-700' : 'bg-slate-200 text-slate-700'}`}>
                               {activePanelData.type === 'custom' ? 'Изрязан' : 'Стандартен'}
@@ -341,12 +341,12 @@ export default function CadEditor({ walls, onSave, isSaving }: CadEditorProps) {
                     </Text>
                     
                     <group position={[-wall.length / 2, 0, 0]}>
-                      {wall.rows.map((row: any, rIdx: number) => {
+                      {(wall.rows || []).map((row: any, rIdx: number) => {
                         let currentX = 0;
                         let currentY = 0;
-                        for(let i = 0; i < rIdx; i++) currentY += wall.rows[i].height;
+                        for(let i = 0; i < rIdx; i++) currentY += (wall.rows[i]?.height || 0);
 
-                        return row.panels.map((panel: any, pIdx: number) => {
+                        return (row.panels || []).map((panel: any, pIdx: number) => {
                           const pX = currentX + panel.width / 2;
                           const actualPanelHeight = panel.height || row.height;
                           const pY = currentY + actualPanelHeight / 2;
