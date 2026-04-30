@@ -55,3 +55,15 @@ model QuoteRequest {
   // ЗАЩИТА: Добавяме default(now()), за да не гърми при съществуващи записи
   updatedAt     DateTime @default(now()) @updatedAt
 }
+// Модел за Блог статии (Автоматизирани през Make.com / Soro.ai)
+model BlogPost {
+  id          String   @id @default(cuid())
+  title       String
+  content     String   @db.Text
+  excerpt     String?  @db.Text
+  imageUrl    String?
+  
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+}

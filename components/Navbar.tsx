@@ -39,6 +39,8 @@ export default function Navbar() {
           <li><Link href="/processes" className="hover:text-teal-700 transition">Процеси</Link></li>
           <li><Link href="/advantages" className="hover:text-teal-700 transition">Предимства</Link></li>
           <li><Link href="/technology" className="hover:text-teal-700 transition">Технология</Link></li>
+          {/* ДОБАВЕН БЛОГ */}
+          <li><Link href="/blog" className="hover:text-teal-700 transition">Блог</Link></li>
           <li><Link href="/calculator" className="text-teal-700 hover:opacity-80 transition">Калкулатор</Link></li>
         </ul>
 
@@ -67,6 +69,8 @@ export default function Navbar() {
             <Link href="/processes" className="py-5 border-b border-slate-100 text-slate-800 hover:text-teal-700" onClick={() => setIsMobileMenuOpen(false)}>Процеси</Link>
             <Link href="/advantages" className="py-5 border-b border-slate-100 text-slate-800 hover:text-teal-700" onClick={() => setIsMobileMenuOpen(false)}>Предимства</Link>
             <Link href="/technology" className="py-5 border-b border-slate-100 text-slate-800 hover:text-teal-700" onClick={() => setIsMobileMenuOpen(false)}>Технология</Link>
+            {/* ДОБАВЕН БЛОГ */}
+            <Link href="/blog" className="py-5 border-b border-slate-100 text-slate-800 hover:text-teal-700" onClick={() => setIsMobileMenuOpen(false)}>Блог</Link>
             <Link href="/calculator" className="py-5 border-b border-slate-100 text-teal-700" onClick={() => setIsMobileMenuOpen(false)}>Калкулатор</Link>
           </div>
           
