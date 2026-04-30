@@ -119,7 +119,7 @@ export default function RequestDetail() {
     if (gMinX === Infinity) { gMinX = 0; gMaxX = 0; gMinY = 0; gMaxY = 0; }
 
     return (
-      <Canvas gl={{ preserveDrawingBuffer: true }} camera={{ position: [0, 20, 30], fov: 45 }} className="print:w-full print:h-[500px]">
+      <Canvas gl={{ preserveDrawingBuffer: true }} camera={{ position: [0, 20, 30], fov: 45 }} className="print:hidden">
         <ambientLight intensity={0.7} />
         <directionalLight position={[10, 30, 10]} intensity={1.5} castShadow />
         <OrbitControls enablePan={true} enableZoom={true} enableRotate={true} />
@@ -197,8 +197,6 @@ export default function RequestDetail() {
   if (!request) return <div className="p-20 text-center text-red-500 min-h-screen bg-slate-50">Заявката не е намерена.</div>;
 
   // --- МАГИЯТА ЗА ВЪЗСТАНОВЯВАНЕ НА ЕТАЖИТЕ ---
-  // Ако базата данни ни е върнала floorsData, ги ползваме. 
-  // Ако не е (защото е стара заявка или липсва в API-то), ги генерираме на база стените!
   const safeFloorsData = request.floorsData && request.floorsData.length > 0 
     ? request.floorsData 
     : (request.cadData && request.cadData.length > 0 
@@ -221,7 +219,7 @@ export default function RequestDetail() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4 border-b border-slate-200 pb-6 print:border-none">
           <div>
             <Link href="/admin/dashboard" className="text-teal-600 text-xs font-bold uppercase tracking-widest hover:underline print:hidden">← Назад към всички</Link>
-            <h1 className="text-2xl font-black text-slate-900 mt-2">Заявка #{request.id.slice(-5).toUpperCase()}</h1>
+            <h1 className="text-2xl font-black text-slate-900 mt-2 print:hidden">Заявка #{request.id.slice(-5).toUpperCase()}</h1>
           </div>
           
           <div className="flex gap-3 print:hidden">
@@ -235,7 +233,7 @@ export default function RequestDetail() {
         </div>
 
         {/* ГОРНА ЧАСТ: ИНФО И ПОДЛОЖКА */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8 print:hidden">
           
           {/* ЛЯВА КОЛОНА */}
           <div className="space-y-6">
@@ -271,31 +269,44 @@ export default function RequestDetail() {
                     <option value="completed">Приключена оферта</option>
                   </select>
                 </div>
-                <div className="hidden print:block pt-2 border-t border-slate-100">
-                  <span className="text-xs text-slate-500">Статус: </span>
-                  <span className="text-sm font-bold text-slate-800 uppercase">{request.status}</span>
-                </div>
               </div>
             </div>
           </div>
 
-          {/* ДЯСНА КОЛОНА (САМО ПОДЛОЖКА) */}
-          <div className="md:col-span-2">
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm overflow-hidden h-full print:shadow-none print:border-slate-300">
-              <h2 className="text-[10px] font-bold uppercase text-slate-400 mb-4 tracking-widest border-b pb-2">Оригинален чертеж (Подложка)</h2>
-              {request.underlayUrl ? (
-                <div className="relative w-full h-[calc(100%-40px)] min-h-[300px] bg-slate-100 rounded-lg overflow-hidden border border-slate-100">
-                   <img src={request.underlayUrl} alt="Client Draw" className="object-contain w-full h-full absolute inset-0" />
-                </div>
-              ) : (
-                <div className="p-10 text-center text-slate-300 text-xs italic flex items-center justify-center h-[300px]">Няма прикачена подложка</div>
-              )}
+          {/* ДЯСНА КОЛОНА (ПОДЛОЖКИ - ГАЛЕРИЯ) */}
+          <div className="md:col-span-2 print:hidden">
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm overflow-hidden h-full">
+              <h2 className="text-[10px] font-bold uppercase text-slate-400 mb-4 tracking-widest border-b pb-2">Галерия чертежи (Подложки)</h2>
+              {(() => {
+                const uiUnderlays = safeFloorsData.filter((f: any) => f.underlay).slice(0, 4);
+                
+                if (uiUnderlays.length > 0) {
+                  return (
+                    <div className={`grid gap-4 w-full h-[calc(100%-40px)] min-h-[300px] ${uiUnderlays.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                      {uiUnderlays.map((f: any) => (
+                        <div key={`ui-gallery-${f.floorId}`} className="relative bg-slate-50 rounded-lg overflow-hidden border border-slate-200 flex flex-col p-2 group">
+                          <img src={f.underlay} alt={f.floorName} className="object-contain w-full h-full flex-1" />
+                          <div className="absolute top-2 left-2 bg-white/90 px-3 py-1 rounded shadow-sm border border-slate-100">
+                              <span className="text-[10px] font-bold uppercase text-slate-600">{f.floorName || `Етаж ${f.floorId}`}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                }
+                
+                return (
+                  <div className="p-10 text-center text-slate-300 text-xs italic flex items-center justify-center h-[300px] bg-slate-50 border border-slate-100 rounded-lg">
+                    Няма прикачени подложки
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
         </div>
 
-        {/* --- СЛУЖЕБЕН ПАНЕЛ / РАЗБИВКА ЕТАЖ ПО ЕТАЖ (ВЕЧЕ ИЗПОЛЗВА safeFloorsData) --- */}
+        {/* --- СЛУЖЕБЕН ПАНЕЛ / РАЗБИВКА ЕТАЖ ПО ЕТАЖ --- */}
         {safeFloorsData.length > 0 && (
             <div className="bg-slate-100 p-4 lg:p-8 rounded-xl border border-slate-200 shadow-sm mb-8 print:hidden">
                 <h2 className="text-xl font-black uppercase tracking-wider text-slate-800 mb-6 flex items-center gap-3">
@@ -421,70 +432,96 @@ export default function RequestDetail() {
         </div>
 
         {/* --- СКРИТ БЛОК ЗА ПЕЧАТ (PRINT ONLY) - ПЪЛНА ПРОИЗВОДСТВЕНА СПЕЦИФИКАЦИЯ --- */}
-        <div className="hidden print:block w-full text-black mt-8">
-            <h1 className="text-3xl font-bold mb-6 text-center border-b-4 border-black pb-4">ОФИЦИАЛНА ПРОИЗВОДСТВЕНА СПЕЦИФИКАЦИЯ БИОЗИД</h1>
-            <div className="mb-8 text-lg">
-                <p><strong>Общо панели за целия проект:</strong> {globalStats.totalPanels} бр.</p>
-                <p><strong>Обща квадратура на панелите:</strong> {globalStats.totalArea.toFixed(2)} м²</p>
+        <div className="hidden print:block w-full text-black mt-2">
+            
+            {/* НОВА ГАЛЕРИЯ С ПОДЛОЖКИ (ДО 4 БРОЯ) В УМАЛЕН МАЩАБ */}
+            {(() => {
+                const printUnderlays = safeFloorsData.filter((f: any) => f.underlay).slice(0, 4);
+                if (printUnderlays.length > 0) {
+                    return (
+                        <div className="mb-6 border-b-2 border-black pb-4 break-inside-avoid">
+                            <h2 className="text-sm font-bold uppercase mb-3">Галерия прикачените чертежи (подложки):</h2>
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                {printUnderlays.map((f: any) => (
+                                    <div key={`print-gallery-${f.floorId}`} className="border border-slate-300 p-2 text-center bg-slate-50">
+                                        <img src={f.underlay} alt={f.floorName} className="h-28 w-full object-contain mb-1" />
+                                        <p className="text-[10px] font-bold uppercase text-slate-600">{f.floorName || `Етаж ${f.floorId}`}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                }
+                return null;
+            })()}
+
+            <h1 className="text-2xl font-bold mb-4 text-center border-b-4 border-black pb-4">ОФИЦИАЛНА ПРОИЗВОДСТВЕНА СПЕЦИФИКАЦИЯ БИОЗИД</h1>
+            
+            {/* ОБЩИ ДАННИ ЗА ПРОЕКТА - КОМПАКТНИ */}
+            <div className="mb-6 flex justify-between items-end bg-slate-50 border border-black p-4">
+                <div>
+                    <p className="text-lg"><strong>Общо панели за целия проект:</strong> {globalStats.totalPanels} бр.</p>
+                    <p className="text-lg"><strong>Обща квадратура на панелите:</strong> {globalStats.totalArea.toFixed(2)} м²</p>
+                </div>
+                <div className="text-right text-sm">
+                    <p><strong>Заявка:</strong> #{request.id.slice(-5).toUpperCase()}</p>
+                    <p><strong>Клиент:</strong> {request.clientName}</p>
+                    <p><strong>Дата:</strong> {new Date().toLocaleDateString('bg-BG')}</p>
+                </div>
             </div>
             
+            {/* ИЗРЕЖДАНЕ НА СПЕЦИФИКАЦИИТЕ ПО ЕТАЖИ БЕЗ ИЗЛИШНО МЯСТО И БЕЗ 3D МОДЕЛИ */}
             {safeFloorsData.map((f: any) => {
                 const floorWalls = request.cadData?.filter((w: any) => w.floorId === f.floorId) || [];
                 if (floorWalls.length === 0) return null;
                 
-                let floorPanelsA = 0, floorPanelsB = 0, floorArea = 0;
+                let floorPanelsA = 0, floorPanelsB = 0, floorCustom = 0, floorArea = 0;
                 floorWalls.forEach((w:any) => {
                     if (w.stats) {
                         floorPanelsA += (w.stats.aFull || 0);
                         floorPanelsB += (w.stats.bFull || 0);
+                        floorCustom += (w.stats.custom || 0);
                         floorArea += w.stats.totalAreaUsed || 0;
                     }
                 });
 
                 return (
-                    <div key={`print-floor-${f.floorId}`} className="mb-12 break-inside-avoid">
-                        <h2 className="text-2xl font-bold mb-4 bg-slate-200 p-3 border border-black">{f.floorName || `Етаж ${f.floorId}`}</h2>
+                    <div key={`print-floor-${f.floorId}`} className="mb-6 break-inside-avoid">
+                        <h2 className="text-xl font-bold mb-3 bg-slate-200 p-2 border border-black uppercase">{f.floorName || `Етаж ${f.floorId}`}</h2>
                         
-                        {/* 3D МОДЕЛ В ПРИНТ БЛОКА */}
-                        <div className="mb-6 border border-black p-2 h-[400px] relative w-full break-inside-avoid">
-                            <p className="text-[12px] font-bold mb-2 uppercase absolute top-2 left-2 z-10 bg-white/80 p-1">3D Модел:</p>
-                            <Scene3D project={projectMock} viewFloor={f.floorId} />
-                        </div>
-
-                        <div className="flex gap-4 mb-4 break-inside-avoid">
-                            {f.underlay && (
-                                <div className="w-1/2 border border-black p-2">
-                                    <p className="text-[12px] font-bold mb-2 uppercase">Оригинална подложка (чертеж):</p>
-                                    <img src={f.underlay} alt={f.floorName} className="w-full h-auto object-contain max-h-[400px]" />
-                                </div>
-                            )}
-                            <div className="flex-1 border border-black p-6 text-base bg-slate-50">
-                                <p className="mb-2"><strong>Брой стени:</strong> {floorWalls.length}</p>
-                                <p className="mb-2"><strong>Панели Тип А (2.50x1.25):</strong> {floorPanelsA} бр.</p>
-                                <p className="mb-2"><strong>Панели Тип Б (2.44x1.44):</strong> {floorPanelsB} бр.</p>
-                                <p className="mb-2 border-t border-slate-300 pt-2"><strong>Площ панели за етажа:</strong> {floorArea.toFixed(2)} м²</p>
+                        <div className="grid grid-cols-2 gap-4 mb-3">
+                            <div className="border border-black p-3 bg-slate-50">
+                                <p className="font-bold text-xs mb-2 border-b pb-1">ДАННИ ЗА ЕТАЖА:</p>
+                                <p className="text-xs mb-1">Брой стени: <strong>{floorWalls.length}</strong></p>
+                                <p className="text-xs">Площ панели за етажа: <strong>{floorArea.toFixed(2)} м²</strong></p>
+                            </div>
+                            <div className="border border-black p-3 bg-slate-50">
+                                <p className="font-bold text-xs mb-2 border-b pb-1">СПЕЦИФИКАЦИЯ ПАНЕЛИ:</p>
+                                <p className="text-xs mb-1">Тип А (2.50x1.25): <strong>{floorPanelsA} бр.</strong></p>
+                                <p className="text-xs mb-1">Тип Б (2.44x1.44): <strong>{floorPanelsB} бр.</strong></p>
+                                <p className="text-xs">Изрязани (Custom): <strong>{floorCustom} бр.</strong></p>
                             </div>
                         </div>
                         
-                        <table className="w-full text-left border-collapse border border-black text-sm break-inside-avoid">
+                        <table className="w-full text-left border-collapse border border-black text-xs">
                             <thead>
                                 <tr className="bg-slate-100">
-                                    <th className="border border-black p-2">Стена (ИД)</th>
-                                    <th className="border border-black p-2">Тип</th>
-                                    <th className="border border-black p-2">Дължина (м)</th>
-                                    <th className="border border-black p-2">Височина (м)</th>
-                                    <th className="border border-black p-2">Разбивка панели</th>
+                                    <th className="border border-black p-1.5 w-16 text-center">Стена</th>
+                                    <th className="border border-black p-1.5">Тип</th>
+                                    <th className="border border-black p-1.5 text-center">Дължина (м)</th>
+                                    <th className="border border-black p-1.5 text-center">Височина (м)</th>
+                                    <th className="border border-black p-1.5">Разбивка панели</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {floorWalls.map((w: any) => (
                                     <tr key={`print-wall-${w.id}`}>
-                                        <td className="border border-black p-2 font-bold text-center">{w.letter || w.displayId}</td>
-                                        <td className="border border-black p-2">{w.type}</td>
-                                        <td className="border border-black p-2 text-center">{w.length?.toFixed(2)}</td>
-                                        <td className="border border-black p-2 text-center">{w.height?.toFixed(2)}</td>
-                                        <td className="border border-black p-2">
-                                            {w.stats && `Тип А: ${w.stats.aFull} бр. | Тип Б: ${w.stats.bFull} бр. | Изрязани: ${w.stats.custom} бр.`}
+                                        <td className="border border-black p-1.5 font-bold text-center">{w.letter || w.displayId}</td>
+                                        <td className="border border-black p-1.5">{w.type}</td>
+                                        <td className="border border-black p-1.5 text-center">{w.length?.toFixed(2)}</td>
+                                        <td className="border border-black p-1.5 text-center">{w.height?.toFixed(2)}</td>
+                                        <td className="border border-black p-1.5">
+                                            {w.stats && `Тип А: ${w.stats.aFull} | Тип Б: ${w.stats.bFull} | Изрязани: ${w.stats.custom || 0}`}
                                         </td>
                                     </tr>
                                 ))}

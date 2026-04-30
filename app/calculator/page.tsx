@@ -1396,34 +1396,37 @@ export default function Calculator() {
                                   <Scene3D project={projectResult} viewFloor={'all'} />
                               </div>
 
-                              {/* БЛОК ЗА ПЕЧАТ (ЗАДАНИЕ 4, 5, 6) */}
-                              <div className="hidden print:block w-full text-black">
-                                  {/* ГАЛЕРИЯ НА ПОДЛОЖКИ (ЗАДАНИЕ 4) */}
-                                  <div className="p-8 border-b-2 border-black mb-8">
-                                      <h2 className="text-lg font-bold uppercase mb-4">Галерия на прикачените чертежи (подложки):</h2>
-                                      <div className="grid grid-cols-3 gap-4">
-                                          {projectResult.floorsData.map((f: any) => f.underlay && (
-                                              <div key={`gallery-${f.id}`} className="border border-slate-300 p-2 text-center">
-                                                  <img src={f.underlay} alt={f.name} className="max-h-48 mx-auto object-contain mb-2" />
-                                                  <p className="text-[10px] font-bold uppercase">{f.name}</p>
-                                              </div>
-                                          ))}
-                                      </div>
-                                  </div>
-
-                                  <h1 className="text-3xl font-bold mb-6 text-center border-b-4 border-black pb-4 print:break-before-page" style={{ breakBefore: 'page' }}>
+                              {/* БЛОК ЗА ПЕЧАТ (СЛЕД ПРОМЕНИТЕ) */}
+                              <div className="hidden print:block w-full text-black px-4 py-4">
+                                  <h1 className="text-2xl font-bold mb-4 text-center border-b-2 border-black pb-2">
                                       ОФИЦИАЛНА ПРОИЗВОДСТВЕНА СПЕЦИФИКАЦИЯ БИОЗИД
                                   </h1>
 
-                                  <div className="mb-8 px-8 text-lg flex justify-between items-end">
+                                  <div className="mb-6 flex justify-between items-start text-sm">
                                       <div>
-                                          <p><strong>Общо панели:</strong> {projectResult.globalStats.aFull + projectResult.globalStats.bFull} бр.</p>
-                                          <p><strong>Обща квадратура:</strong> {projectResult.globalStats.totalAreaUsed.toFixed(2)} м²</p>
+                                          <p><strong>Общо панели за целия проект:</strong> {projectResult.globalStats.aFull + projectResult.globalStats.bFull} бр.</p>
+                                          <p><strong>Обща квадратура на панелите:</strong> {projectResult.globalStats.totalAreaUsed.toFixed(2)} м²</p>
                                       </div>
-                                      <div className="text-right text-sm">
+                                      <div className="text-right">
                                           <p>Клиент: {clientName}</p>
                                           <p>Дата: {new Date().toLocaleDateString('bg-BG')}</p>
                                       </div>
+                                  </div>
+
+                                  <div className="border border-slate-300 rounded-lg p-4 mb-8">
+                                      <h2 className="text-xs font-bold uppercase mb-4 border-b border-slate-200 pb-2 text-slate-600">Оригинални чертежи (Подложки)</h2>
+                                      {projectResult.floorsData.filter((f: any) => f.underlay).length > 0 ? (
+                                          <div className="grid grid-cols-2 gap-4 max-w-4xl mx-auto">
+                                              {projectResult.floorsData.filter((f: any) => f.underlay).slice(0, 4).map((f: any) => (
+                                                  <div key={`gallery-${f.id}`} className="text-center">
+                                                      <img src={f.underlay} alt={f.name} className="max-h-40 mx-auto object-contain border border-slate-200 shadow-sm p-1" />
+                                                      <p className="text-[10px] font-bold uppercase mt-2">{f.name}</p>
+                                                  </div>
+                                              ))}
+                                          </div>
+                                      ) : (
+                                          <p className="text-center text-xs text-slate-400 italic py-6">Няма прикачени подложки</p>
+                                      )}
                                   </div>
                                   
                                   {projectResult.floorsData.map((f: any) => {
@@ -1441,21 +1444,21 @@ export default function Calculator() {
                                       });
 
                                       return (
-                                          <div key={`print-floor-${f.id}`} className="px-8 mb-12 break-inside-avoid">
-                                              <h2 className="text-xl font-bold mb-4 bg-slate-100 p-3 border border-black uppercase">{f.name}</h2>
+                                          <div key={`print-floor-${f.id}`} className="mb-8 break-inside-avoid">
+                                              <h2 className="text-lg font-bold mb-3 bg-slate-100 p-2 border border-black uppercase">{f.name}</h2>
                                               
-                                              <div className="grid grid-cols-2 gap-6 mb-6">
-                                                  <div className="border border-black p-4 bg-slate-50">
-                                                      <p className="font-bold text-sm mb-2 border-b pb-1">ДАННИ ЗА ЕТАЖА:</p>
-                                                      <p className="text-sm">Брой стени: <strong>{floorWalls.length}</strong></p>
-                                                      <p className="text-sm">Височина на стените: <strong>{f.height.toFixed(2)} м</strong></p>
-                                                      <p className="text-sm">Площ за етажа: <strong>{floorArea.toFixed(2)} м²</strong></p>
+                                              <div className="grid grid-cols-2 gap-4 mb-4">
+                                                  <div className="border border-black p-3 bg-slate-50 text-sm">
+                                                      <p className="font-bold mb-2 border-b border-slate-300 pb-1">ДАННИ ЗА ЕТАЖА:</p>
+                                                      <p>Брой стени: <strong>{floorWalls.length}</strong></p>
+                                                      <p>Височина на стените: <strong>{f.height.toFixed(2)} м</strong></p>
+                                                      <p>Площ за етажа: <strong>{floorArea.toFixed(2)} м²</strong></p>
                                                   </div>
-                                                  <div className="border border-black p-4 bg-slate-50">
-                                                      <p className="font-bold text-sm mb-2 border-b pb-1">СПЕЦИФИКАЦИЯ ПАНЕЛИ:</p>
-                                                      <p className="text-sm">Тип А (2.50x1.25): <strong>{floorPanelsA} бр.</strong></p>
-                                                      <p className="text-sm">Тип Б (2.44x1.44): <strong>{floorPanelsB} бр.</strong></p>
-                                                      <p className="text-sm">Изрязани (Custom): <strong>{floorCustom} бр.</strong></p>
+                                                  <div className="border border-black p-3 bg-slate-50 text-sm">
+                                                      <p className="font-bold mb-2 border-b border-slate-300 pb-1">СПЕЦИФИКАЦИЯ ПАНЕЛИ:</p>
+                                                      <p>Тип А (2.50x1.25): <strong>{floorPanelsA} бр.</strong></p>
+                                                      <p>Тип Б (2.44x1.44): <strong>{floorPanelsB} бр.</strong></p>
+                                                      <p>Изрязани (Custom): <strong>{floorCustom} бр.</strong></p>
                                                   </div>
                                               </div>
                                               
@@ -1472,8 +1475,8 @@ export default function Calculator() {
                                                   <tbody>
                                                       {floorWalls.map((w: any) => (
                                                           <tr key={`print-wall-${w.id}`}>
-                                                              <td className="border border-black p-2 font-bold text-center flex flex-col items-center">
-                                                                  <span>{w.letter}</span>
+                                                              <td className="border border-black p-2 font-bold text-center">
+                                                                  {w.letter}
                                                               </td>
                                                               <td className="border border-black p-2">{w.type}</td>
                                                               <td className="border border-black p-2 text-center">{w.length.toFixed(2)}</td>
