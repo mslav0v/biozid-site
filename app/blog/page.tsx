@@ -2,12 +2,12 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { PrismaClient } from '@prisma/client';
-import Script from 'next/script';
 
 const prisma = new PrismaClient();
 
-// ---> ДОБАВЕНО: Спираме статичното кеширане, за да зареждаме Soro на живо <---
+// Задължаваме Vercel да генерира тази страница наново при всяко посещение
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 function formatDateBadge(dateString: string | Date) {
   const date = new Date(dateString);
@@ -26,7 +26,6 @@ export default async function BlogPage() {
   });
 
   // 2. Взимаме моделите къщи за страничната лента
-  // Ако моделът ти в Prisma се казва различно (напр. HouseModel), смени го тук
   const houses = await prisma.house.findMany({
     take: 4, // Показваме 4-те най-популярни или нови модела
   });
@@ -48,16 +47,22 @@ export default async function BlogPage() {
           </div>
 
           <div id="soro-blog" className="min-h-[600px]">
-            <div className="animate-pulse flex flex-col gap-8">
-              <div className="h-64 bg-slate-50 rounded-xl w-full"></div>
-              <div className="h-8 bg-slate-50 rounded w-3/4"></div>
-              <div className="h-4 bg-slate-50 rounded w-1/2"></div>
-            </div>
+            {/* Тук Soro ще инжектира съдържанието */}
           </div>
 
-          <Script 
-            src="https://app.trysoro.com/api/embed/c93c5a74-b1e7-4bbe-af5e-c74688e230f3"
-            strategy="lazyOnload" 
+          {/* 
+            КЛАСИЧЕСКИ HTML SCRIPT ТАГ 
+            Слагаме го вътре в dangerouslySetInnerHTML, за да не го пипа Next.js 
+          */}
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                var script = document.createElement('script');
+                script.src = "https://app.trysoro.com/api/embed/c93c5a74-b1e7-4bbe-af5e-c74688e230f3?t=" + new Date().getTime(); 
+                script.defer = true;
+                document.body.appendChild(script);
+              `,
+            }}
           />
         </div>
 
