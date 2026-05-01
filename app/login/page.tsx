@@ -3,34 +3,46 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { signIn } from "next-auth/react"; // ВАЖНО: Импортираме реалната функция за вход
+import { useRouter } from "next/navigation";
 
 export default function AdminLogin() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState(''); // Сменихме email на username, за да съвпада с route.ts
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
 
-    // Тук по-късно ще сложим реалната логика за връзка със Supabase/Бекенда
-    setTimeout(() => {
-      if (email === 'admin@biozid.bg' && password === 'admin123') {
-        // Успешен вход -> пренасочване към таблото (Dashboard)
-        window.location.href = '/admin/dashboard';
-      } else {
-        setError('Грешен имейл или парола. Моля, опитайте отново.');
+    try {
+      // ИЗПЪЛНЯВАМЕ РЕАЛНИЯ ВХОД ЧРЕЗ NEXTAUTH
+      const result = await signIn("credentials", {
+        username: username,
+        password: password,
+        redirect: false, // Спираме автоматичното пренасочване, за да хванем грешки
+      });
+
+      if (result?.error) {
+        setError('Грешен потребител или парола. Опитайте отново.');
         setIsLoading(false);
+      } else {
+        // Успешен вход - пренасочваме към админ панела
+        router.push("/admin/dashboard"); 
+        router.refresh(); // Обновяваме сесията
       }
-    }, 1500); // Симулираме време за зареждане
+    } catch (err) {
+      setError('Възникна системна грешка. Моля, опитайте по-късно.');
+      setIsLoading(false);
+    }
   };
 
   return (
     <main className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4">
       
-      {/* Бутон за връщане към сайта */}
       <Link href="/" className="absolute top-6 left-6 text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-teal-600 transition flex items-center gap-2">
         <span>&larr;</span> Към сайта
       </Link>
@@ -46,20 +58,20 @@ export default function AdminLogin() {
           <form onSubmit={handleLogin} className="space-y-6">
             
             {error && (
-              <div className="bg-red-50 text-red-600 p-3 rounded text-xs font-bold border border-red-100 text-center">
+              <div className="bg-red-50 text-red-600 p-3 rounded text-xs font-bold border border-red-100 text-center animate-shake">
                 {error}
               </div>
             )}
 
             <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Служебен Имейл</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Потребителско име</label>
               <input 
-                type="email" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text" 
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 required
                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded outline-none focus:border-teal-500 transition text-sm font-medium text-slate-800"
-                placeholder="office@biozid.bg"
+                placeholder="admin"
               />
             </div>
 

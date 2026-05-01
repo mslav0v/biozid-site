@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import TrackedLink from '@/components/TrackedLink'; // ИМПОРТИРАМЕ НОВИЯ КОМПОНЕНТ
 
 export const dynamic = 'force-dynamic';
 
@@ -38,7 +39,6 @@ export default async function HousesPage() {
               {houses.map((house) => {
                 const houseTags = Array.isArray(house.tags) ? house.tags : [];
                 
-                // Форматиране на цената
                 const rawPrice = String(house.price || '0');
                 const cleanPrice = rawPrice.replace(/[^0-9.]/g, ''); 
                 const priceValue = parseFloat(cleanPrice);
@@ -46,12 +46,19 @@ export default async function HousesPage() {
                   ? new Intl.NumberFormat('en-US').format(priceValue).replace(/,/g, ' ') + ' €'
                   : rawPrice + ' €';
 
-                // Генериране на автоматичното съобщение
                 const autoMessage = `Здравейте, интересувам се от модел ${house.name} (${house.area} кв.м.). Моля да се свържете с мен за повече информация.`;
 
                 return (
                   <div key={house.id} className="group flex flex-col bg-white rounded-[32px] overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 border border-slate-50">
-                    <Link href={`/houses/${house.id}`} className="relative h-64 md:h-72 overflow-hidden">
+                    
+                    {/* ЗАМЕНЯМЕ <Link> С <TrackedLink> ЗА СНИМКАТА */}
+                    <TrackedLink 
+                      href={`/houses/${house.id}`} 
+                      className="relative h-64 md:h-72 overflow-hidden"
+                      eventAction="view_house_details"
+                      eventCategory="Houses_Catalog"
+                      eventLabel={`Model: ${house.name}`}
+                    >
                       {house.imageUrl ? (
                         <Image src={house.imageUrl} alt={house.name} fill className="object-cover transition-transform duration-700 group-hover:scale-110" />
                       ) : (
@@ -61,13 +68,19 @@ export default async function HousesPage() {
                       <div className="absolute top-6 right-6 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full shadow-lg">
                          <span className="text-xs font-bold text-slate-900">{house.area} м²</span>
                       </div>
-                    </Link>
+                    </TrackedLink>
                     
                     <div className="p-8 flex flex-col flex-grow">
                       <div className="mb-6">
-                        <Link href={`/houses/${house.id}`}>
+                        {/* ЗАМЕНЯМЕ <Link> С <TrackedLink> ЗА ЗАГЛАВИЕТО */}
+                        <TrackedLink 
+                          href={`/houses/${house.id}`}
+                          eventAction="view_house_details"
+                          eventCategory="Houses_Catalog"
+                          eventLabel={`Model: ${house.name}`}
+                        >
                           <h2 className="text-2xl font-light text-slate-900 group-hover:text-teal-700 transition-colors mb-2">{house.name}</h2>
-                        </Link>
+                        </TrackedLink>
                         <div className="flex flex-wrap gap-2">
                           {houseTags.slice(0, 2).map((tag, idx) => (
                             <span key={idx} className="text-[8px] font-bold uppercase tracking-widest text-teal-600">{tag}</span>
@@ -95,9 +108,16 @@ export default async function HousesPage() {
                           <span className="text-[9px] text-slate-400 uppercase font-bold tracking-widest">Инвестиция от</span>
                           <span className="text-xl font-bold text-slate-900">{formattedPrice}</span>
                         </div>
-                        <Link href={`/contacts?message=${encodeURIComponent(autoMessage)}`} className="bg-slate-900 text-white px-6 py-4 rounded-2xl text-[10px] font-bold uppercase tracking-[0.15em] hover:bg-teal-700 transition-all shadow-lg">
+                        {/* ЗАМЕНЯМЕ <Link> С <TrackedLink> ЗА БУТОНА ЗА КОНТАКТ */}
+                        <TrackedLink 
+                          href={`/contacts?message=${encodeURIComponent(autoMessage)}`} 
+                          className="bg-slate-900 text-white px-6 py-4 rounded-2xl text-[10px] font-bold uppercase tracking-[0.15em] hover:bg-teal-700 transition-all shadow-lg"
+                          eventAction="click_contact_from_catalog"
+                          eventCategory="Leads"
+                          eventLabel={`Inquiry: ${house.name}`}
+                        >
                           Свържи се с нас
-                        </Link>
+                        </TrackedLink>
                       </div>
                     </div>
                   </div>

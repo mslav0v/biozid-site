@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script"; 
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,21 +15,28 @@ const geistMono = Geist_Mono({
 
 // --- SEO И НАСТРОЙКИ ЗА СПОДЕЛЯНЕ ---
 export const metadata: Metadata = {
-  title: "БИОЗИД | Енергоефективни сглобяеми къщи", // Текстът в таба на браузъра
-  description: "Екологично бързо строителство на къщи във фабрична среда, 3D модели и чертежи за панели БИОЗИД.", // Описанието под линка в Google
-  
-  // Тук въвеждаш твоите ключови думи, разделени със запетая
+  metadataBase: new URL(
+    process.env.NODE_ENV === 'production' 
+      ? 'https://www.biozid.bg' 
+      : 'http://localhost:3001'
+  ),
+  title: "БИОЗИД | Енергоефективни сглобяеми къщи",
+  description: "Екологично бързо строителство на къщи във фабрична среда, 3D модели и чертежи за панели БИОЗИД.",
   keywords: ["биозид", "строителни панели", "калкулатор за панели", "3D чертане", "сухо строителство", "сглобяеми къщи", "сглобяеми къщи с метална конструкция"], 
   
-  // Настройки за споделяне във Facebook, Viber и др.
+  // ---> ДОБАВЕНО: Google Site Verification <---
+  verification: {
+    google: "NNoCCzEj9KEfpEXMDtXvTe-TxFv07p2PKx1KXa1cUfQ",
+  },
+
   openGraph: {
     title: "БИОЗИД | Енергоефективни сглобяеми къщи",
     description: "Екологично бързо строителство на къщи във фабрична среда, 3D модели и чертежи за панели БИОЗИД.",
-    url: "https://biozid.bg", // ВАЖНО: Смени с реалния си домейн
+    url: "https://www.biozid.bg", 
     siteName: "БИОЗИД",
     images: [
       {
-        url: "/og-image.jpg", // Сложи подходяща картинка (напр. лого) в папка public
+        url: "/og-image.jpg", 
         width: 1200,
         height: 630,
       },
@@ -45,10 +53,37 @@ export default function RootLayout({
 }>) {
   return (
     <html
-      lang="bg" // Сменено от "en" на "bg" за правилно SEO на български
+      lang="bg"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {/* --- GOOGLE ANALYTICS (GA4) --- */}
+        {process.env.NEXT_PUBLIC_GA_ID && (
+          <>
+            <Script
+              strategy="afterInteractive"
+              src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`}
+            />
+            <Script
+              id="google-analytics"
+              strategy="afterInteractive"
+              dangerouslySetInnerHTML={{
+                __html: `
+                  window.dataLayer = window.dataLayer || [];
+                  function gtag(){dataLayer.push(arguments);}
+                  gtag('js', new Date());
+                  gtag('config', '${process.env.NEXT_PUBLIC_GA_ID}', {
+                    page_path: window.location.pathname,
+                  });
+                `,
+              }}
+            />
+          </>
+        )}
+
+        {/* Съдържанието на сайта */}
+        {children}
+      </body>
     </html>
   );
 }

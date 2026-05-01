@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import TrackedLink from '@/components/TrackedLink'; // ИМПОРТИРАМЕ НОВИЯ КОМПОНЕНТ
 
 export default async function HouseDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -11,7 +12,6 @@ export default async function HouseDetailsPage({ params }: { params: Promise<{ i
 
   if (!house) notFound();
 
-  // Подготовка на галерията (Главна снимка + допълнителни)
   const gallery = house.gallery && house.gallery.length > 0 
     ? [house.imageUrl, ...house.gallery].filter(Boolean) as string[]
     : [house.imageUrl].filter(Boolean) as string[];
@@ -22,7 +22,6 @@ export default async function HouseDetailsPage({ params }: { params: Promise<{ i
     ? new Intl.NumberFormat('en-US').format(priceValue).replace(/,/g, ' ') + ' €'
     : rawPrice + ' €';
 
-  // Генериране на автоматичното съобщение
   const autoMessage = `Здравейте, интересувам се от модел ${house.name} (${house.area} кв.м.). Моля да се свържете с мен за повече информация.`;
 
   return (
@@ -47,7 +46,6 @@ export default async function HouseDetailsPage({ params }: { params: Promise<{ i
                 )}
               </div>
               
-              {/* МАЛКИ СНИМКИ (ГАЛЕРИЯ) */}
               {gallery.length > 1 && (
                 <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
                   {gallery.map((img, idx) => (
@@ -66,7 +64,6 @@ export default async function HouseDetailsPage({ params }: { params: Promise<{ i
                 <p className="text-3xl font-bold text-teal-700 tracking-tight">{formattedPrice}</p>
               </div>
 
-              {/* ОСНОВНИ ПАРАМЕТРИ */}
               <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-10 border-y border-slate-50 py-8">
                 <div className="text-center">
                   <p className="text-[9px] uppercase font-bold text-slate-400 mb-1 tracking-widest">Площ</p>
@@ -82,7 +79,6 @@ export default async function HouseDetailsPage({ params }: { params: Promise<{ i
                 </div>
               </div>
 
-              {/* ТЕХНИЧЕСКА СПЕЦИФИКАЦИЯ - ПОДРОБНА */}
               <div className="space-y-8 mb-12">
                 <div>
                   <h3 className="text-[10px] font-bold uppercase text-teal-700 tracking-[0.3em] mb-4">Конструкция и стени</h3>
@@ -112,10 +108,16 @@ export default async function HouseDetailsPage({ params }: { params: Promise<{ i
               </div>
 
               <div className="flex flex-col gap-4">
-                {/* Запазен е само бутонът за запитване, стилизиран като основен Call-To-Action */}
-                <Link href={`/contacts?message=${encodeURIComponent(autoMessage)}`} className="bg-slate-900 text-white text-center py-5 rounded-2xl text-[11px] font-bold uppercase tracking-[0.2em] hover:bg-teal-700 transition-all shadow-xl">
+                {/* ЗАМЕНЯМЕ <Link> С <TrackedLink> ЗА БУТОНА ЗА ЗАПИТВАНЕ */}
+                <TrackedLink 
+                  href={`/contacts?message=${encodeURIComponent(autoMessage)}`} 
+                  className="bg-slate-900 text-white text-center py-5 rounded-2xl text-[11px] font-bold uppercase tracking-[0.2em] hover:bg-teal-700 transition-all shadow-xl"
+                  eventAction="click_inquiry_button"
+                  eventCategory="Leads"
+                  eventLabel={`Inquiry from Details: ${house.name}`}
+                >
                   Запитване за модела
-                </Link>
+                </TrackedLink>
               </div>
             </div>
           </div>
@@ -126,7 +128,6 @@ export default async function HouseDetailsPage({ params }: { params: Promise<{ i
   );
 }
 
-// Помощен компонент за редовете със спецификации
 function SpecItem({ label, value }: { label: string, value: any }) {
   return (
     <div className="flex justify-between items-end border-b border-slate-50 pb-2">
