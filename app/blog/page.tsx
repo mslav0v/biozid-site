@@ -57,7 +57,7 @@ export default async function BlogPage() {
 
           <Script 
             src="https://app.trysoro.com/api/embed/c93c5a74-b1e7-4bbe-af5e-c74688e230f3"
-            strategy="afterInteractive" 
+            strategy="lazyOnload" 
           />
         </div>
 
