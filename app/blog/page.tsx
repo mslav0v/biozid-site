@@ -93,13 +93,13 @@ export default async function BlogPage() {
                     <div className="relative aspect-[16/10] overflow-hidden rounded-lg bg-slate-100 mb-3">
                       <img 
                         src={house.imageUrl || '/house-placeholder.jpg'} 
-                        alt={house.title} 
+                        alt={house.name} 
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                       />
                       <div className="absolute inset-0 bg-black/5 group-hover:bg-black/0 transition-colors" />
                     </div>
                     <h4 className="text-sm font-bold text-slate-900 group-hover:text-teal-600 transition-colors leading-snug">
-                      {house.title}
+                      {house.name}
                     </h4>
                     <p className="text-[11px] text-teal-600 font-bold uppercase tracking-wider mt-1">Виж модела →</p>
                   </Link>
