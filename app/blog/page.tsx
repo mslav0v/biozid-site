@@ -5,7 +5,9 @@ import { PrismaClient } from '@prisma/client';
 import Script from 'next/script';
 
 const prisma = new PrismaClient();
-export const revalidate = 60; 
+
+// ---> ДОБАВЕНО: Спираме статичното кеширане, за да зареждаме Soro на живо <---
+export const dynamic = 'force-dynamic';
 
 function formatDateBadge(dateString: string | Date) {
   const date = new Date(dateString);
