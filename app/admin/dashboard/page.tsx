@@ -219,6 +219,12 @@ export default function AdminDashboard() {
           <button onClick={() => { setActiveTab('requests'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-4 py-4 md:py-3 rounded text-xs font-bold uppercase tracking-widest transition ${activeTab === 'requests' ? 'bg-teal-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>Заявки (Оферти)</button>
           <button onClick={() => { setActiveTab('houses'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-4 py-4 md:py-3 rounded text-xs font-bold uppercase tracking-widest transition ${activeTab === 'houses' ? 'bg-teal-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>Каталог Къщи</button>
           <button onClick={() => { setActiveTab('settings'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-4 py-4 md:py-3 rounded text-xs font-bold uppercase tracking-widest transition ${activeTab === 'settings' ? 'bg-teal-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>Служители</button>
+          <Link 
+  href="/admin/dashboard/cache" 
+  className="block px-6 py-4 text-slate-300 hover:text-white font-bold uppercase tracking-wider text-sm transition-colors"
+>
+  ИЗЧИСТИ КЕШ
+</Link>
         </nav>
       </aside>
 

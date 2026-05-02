@@ -2,12 +2,12 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { PrismaClient } from '@prisma/client';
+import Script from 'next/script';
 
 const prisma = new PrismaClient();
 
-// Задължаваме Vercel да генерира тази страница наново при всяко посещение
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+// Връщаме кеша, за да е бърз сайтът. Обновяваме го автоматично на всеки 2 часа (7200 секунди)
+export const revalidate = 7200;
 
 function formatDateBadge(dateString: string | Date) {
   const date = new Date(dateString);
@@ -51,17 +51,19 @@ export default async function BlogPage() {
           </div>
 
           {/* 
-            КЛАСИЧЕСКИ HTML SCRIPT ТАГ 
-            Слагаме го вътре в dangerouslySetInnerHTML, за да не го пипа Next.js 
+            Използваме Next.js Script с dangerouslySetInnerHTML за да избегнем React грешки 
+            и запазваме cache-busting логиката.
           */}
-          <script
+          <Script 
+            id="soro-loader"
+            strategy="afterInteractive"
             dangerouslySetInnerHTML={{
               __html: `
-                var script = document.createElement('script');
-                script.src = "https://app.trysoro.com/api/embed/c93c5a74-b1e7-4bbe-af5e-c74688e230f3?t=" + new Date().getTime(); 
-                script.defer = true;
-                document.body.appendChild(script);
-              `,
+                var s = document.createElement('script');
+                s.src = "https://app.trysoro.com/api/embed/c93c5a74-b1e7-4bbe-af5e-c74688e230f3?t=" + new Date().getTime();
+                s.defer = true;
+                document.body.appendChild(s);
+              `
             }}
           />
         </div>
