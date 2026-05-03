@@ -74,16 +74,18 @@ export default async function BlogPage() {
           {/* ТЪРСЕНЕ */}
           <div>
             <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-6">Търсене</h3>
-            <div className="relative border-b border-slate-200 pb-2 focus-within:border-teal-500 transition-colors">
+            <form action="/search" method="GET" className="relative border-b border-slate-200 pb-2 focus-within:border-teal-500 transition-colors">
               <input 
                 type="text" 
+                name="q"
                 placeholder="Въведи дума..." 
                 className="w-full bg-transparent text-sm outline-none pr-8"
+                required
               />
-              <button className="absolute right-0 top-0 text-slate-400 hover:text-teal-600">
+              <button type="submit" className="absolute right-0 top-0 text-slate-400 hover:text-teal-600">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
               </button>
-            </div>
+            </form>
           </div>
 
           {/* НОВАТА ЧАСТ: МОДЕЛИ КЪЩИ */}
