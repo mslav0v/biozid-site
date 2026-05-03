@@ -60,7 +60,7 @@ export default async function SearchPage({
       const mappedBlogs = blogPosts.map(p => ({
         id: `blog-local-${p.id}`,
         title: p.title,
-        url: `/blog/${p.slug || p.id}`,
+        url: `/blog/${p.id}`, // <-- ТУК Е ПОПРАВКАТА: Премахнахме p.slug
         typeLabel: 'Блог Статия'
       }));
 
