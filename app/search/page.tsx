@@ -60,7 +60,7 @@ export default async function SearchPage({
       const mappedBlogs = blogPosts.map(p => ({
         id: `blog-local-${p.id}`,
         title: p.title,
-        url: `/blog/${p.id}`, // <-- ТУК Е ПОПРАВКАТА: Премахнахме p.slug
+        url: `/blog/${p.id}`,
         typeLabel: 'Блог Статия'
       }));
 
@@ -75,8 +75,8 @@ export default async function SearchPage({
       const soroRes = await fetch('https://app.trysoro.com/api/embed/c93c5a74-b1e7-4bbe-af5e-c74688e230f3', { cache: 'no-store' });
       const soroText = await soroRes.text();
       
-      // Извличаме JSON масива със статиите чрез Regex
-      const match = soroText.match(/var SORO_ARTICLES\s*=\s*(\[.*?\]);/s);
+      // ПОПРАВКА ТУК: Използваме [\s\S] вместо . и махаме /s флага за съвместимост с по-стари ES версии
+      const match = soroText.match(/var SORO_ARTICLES\s*=\s*(\[[\s\S]*?\]);/);
       
       if (match && match[1]) {
         const articles = JSON.parse(match[1]);
