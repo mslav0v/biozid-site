@@ -23,7 +23,7 @@ export default function Home() {
               Високоефективни <br className="hidden sm:block" /> <span className="italic text-teal-700">здравословни</span> домове
           </h1>
           <p className="text-base md:text-xl text-slate-600 font-light leading-relaxed mb-8 max-w-xl mx-auto lg:mx-0">
-              Използваме авангардни материали и собствена производствена технология за създаване на енергийно ефективни и устойчиви къщи.
+              Използваме съвременни, екологични материали и собствена производствена технология за създаване на енергийно ефективни и устойчиви къщи.
           </p>
           {/* Бутоните стават w-full на мобилни */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start w-full sm:w-auto">
