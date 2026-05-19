@@ -72,7 +72,7 @@ export default async function SearchPage({
     // 3. ТЪРСЕНЕ В SORO СТАТИИТЕ (Външния източник)
     try {
       // Изтегляме скрипта на Soro
-      const soroRes = await fetch('https://app.trysoro.com/api/embed/c93c5a74-b1e7-4bbe-af5e-c74688e230f3', { cache: 'no-store' });
+      const soroRes = await fetch('https://app.trysoro.com/api/embed/9956916d-04d4-476a-afc4-0ab6bb82b06d', { cache: 'no-store' });
       const soroText = await soroRes.text();
       
       // ПОПРАВКА ТУК: Използваме [\s\S] вместо . и махаме /s флага за съвместимост с по-стари ES версии

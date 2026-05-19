@@ -60,7 +60,7 @@ export default async function BlogPage() {
             dangerouslySetInnerHTML={{
               __html: `
                 var s = document.createElement('script');
-                s.src = "https://app.trysoro.com/api/embed/c93c5a74-b1e7-4bbe-af5e-c74688e230f3?t=" + new Date().getTime();
+                s.src = "https://app.trysoro.com/api/embed/9956916d-04d4-476a-afc4-0ab6bb82b06d" + new Date().getTime();
                 s.defer = true;
                 document.body.appendChild(s);
               `

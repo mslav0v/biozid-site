@@ -47,7 +47,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 3. ДИНАМИЧНИ СТРАНИЦИ: SORO БЛОГ СТАТИИ
   let blogRoutes: MetadataRoute.Sitemap = [];
   try {
-    const soroRes = await fetch('https://app.trysoro.com/api/embed/c93c5a74-b1e7-4bbe-af5e-c74688e230f3', { cache: 'no-store' });
+    const soroRes = await fetch('https://app.trysoro.com/api/embed/9956916d-04d4-476a-afc4-0ab6bb82b06d', { cache: 'no-store' });
     const soroText = await soroRes.text();
     
     const match = soroText.match(/var SORO_ARTICLES\s*=\s*(\[[\s\S]*?\]);/);
