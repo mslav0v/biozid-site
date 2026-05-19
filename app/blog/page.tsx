@@ -50,21 +50,11 @@ export default async function BlogPage() {
             {/* Тук Soro ще инжектира съдържанието */}
           </div>
 
-          {/* 
-            Използваме Next.js Script с dangerouslySetInnerHTML за да избегнем React грешки 
-            и запазваме cache-busting логиката.
+          {/* Правилният начин за зареждане на Soro в Next.js 
           */}
           <Script 
-            id="soro-loader"
+            src="https://app.trysoro.com/api/embed/9956916d-04d4-476a-afc4-0ab6bb82b06d"
             strategy="afterInteractive"
-            dangerouslySetInnerHTML={{
-              __html: `
-                var s = document.createElement('script');
-                s.src = "https://app.trysoro.com/api/embed/9956916d-04d4-476a-afc4-0ab6bb82b06d" + new Date().getTime();
-                s.defer = true;
-                document.body.appendChild(s);
-              `
-            }}
           />
         </div>
 
