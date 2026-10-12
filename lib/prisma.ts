@@ -9,3 +9,6 @@ export const prisma =
   });
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+
+// КРИТИЧНО ЗА БИЛДА: Експортираме и като default export
+export default prisma;
