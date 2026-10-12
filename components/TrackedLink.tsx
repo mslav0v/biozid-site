@@ -1,13 +1,10 @@
-// components/TrackedLink.tsx
 "use client";
 
 import Link from "next/link";
+import { ComponentProps } from "react";
 import { trackEvent } from "@/utils/analytics";
 
-interface TrackedLinkProps {
-  href: string;
-  className?: string;
-  children: React.ReactNode;
+interface TrackedLinkProps extends ComponentProps<typeof Link> {
   eventAction: string;
   eventCategory: string;
   eventLabel: string;
@@ -19,15 +16,30 @@ export default function TrackedLink({
   children, 
   eventAction, 
   eventCategory, 
-  eventLabel 
+  eventLabel,
+  onClick,
+  ...props
 }: TrackedLinkProps) {
   
-  const handleClick = () => {
-    trackEvent(eventAction, eventCategory, eventLabel);
+  const handleClick = (e: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
+    try {
+      trackEvent(eventAction, eventCategory, eventLabel);
+    } catch (error) {
+      console.error("Грешка при проследяване на събитието:", error);
+    }
+
+    if (onClick) {
+      onClick(e);
+    }
   };
 
   return (
-    <Link href={href} className={className} onClick={handleClick}>
+    <Link 
+      href={href} 
+      className={className} 
+      onClick={handleClick}
+      {...props}
+    >
       {children}
     </Link>
   );

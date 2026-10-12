@@ -1,8 +1,47 @@
-"use client";
-
+import { Metadata } from 'next';
 import Image from 'next/image';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+
+// 1. ПЪЛНИ SEO И AI МЕТАДАННИ
+export const metadata: Metadata = {
+  title: "Процеси и етапи на изграждане на сглобяеми къщи | БИОЗИД",
+  description: "Шестте ключови етапа в изграждането на екологична сглобяема къща БИОЗИД: фундамент, метален скелет, конопени панели, фасада, пожарозащита и покрив.",
+  keywords: [
+    "процеси на строителство",
+    "етапи на изграждане",
+    "сглобяеми къщи етапи",
+    "метален скелет",
+    "фундамент сглобяема къща",
+    "панели биозид",
+    "покрив соларни панели"
+  ],
+  alternates: {
+    canonical: "https://biozid.bg/processes",
+  },
+  openGraph: {
+    title: "Процеси и етапи на изграждане на сглобяеми къщи | БИОЗИД",
+    description: "Шестте ключови етапа в изграждането на екологична сглобяема къща БИОЗИД.",
+    url: "https://biozid.bg/processes",
+    siteName: "БИОЗИД",
+    locale: "bg_BG",
+    type: "article",
+    images: [
+      {
+        url: "/2-steel-structure.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Сглобяване на масивна метална конструкция БИОЗИД",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Процеси и етапи на изграждане на сглобяеми къщи | БИОЗИД",
+    description: "Шестте ключови етапа в изграждането на екологична сглобяема къща БИОЗИД.",
+    images: ["/2-steel-structure.jpg"],
+  },
+};
 
 export default function ProcessesPage() {
   const steps = [
@@ -79,9 +118,54 @@ export default function ProcessesPage() {
     }
   ];
 
+  // 2. JSON-LD СТРУКТУРИРАНИ ДАННИ (HOWTO SCHEMA) ЗА AI БОТОВЕ И GOOGLE
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "HowTo",
+        "@id": "https://biozid.bg/processes/#howto",
+        "name": "Етапи на изграждане на сглобяема къща БИОЗИД",
+        "description": "Технологичен процес и 6-те основни етапа за изграждане на екологична сглобяема къща БИОЗИД.",
+        "step": steps.map((s, idx) => ({
+          "@type": "HowToStep",
+          "position": idx + 1,
+          "name": s.title,
+          "itemListElement": s.bullets.map((b) => ({
+            "@type": "HowToDirection",
+            "text": b
+          })),
+          "image": `https://biozid.bg${s.imageSrc}`
+        }))
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Начало",
+            "item": "https://biozid.bg"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Процеси",
+            "item": "https://biozid.bg/processes"
+          }
+        ]
+      }
+    ]
+  };
+
   return (
     <div className="min-h-screen bg-white relative">
-      
+      {/* Инжектиране на структурираните данни */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       {/* 1. HEADER / NAVIGATION */}
       <Navbar />
 
@@ -111,6 +195,7 @@ export default function ProcessesPage() {
                     src={step.imageSrc}
                     alt={step.imageAlt}
                     fill
+                    priority={index === 0}
                     sizes="(max-width: 768px) 100vw, 50vw"
                     className="object-cover transition-transform duration-700 group-hover:scale-105"
                   />

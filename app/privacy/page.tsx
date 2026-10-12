@@ -1,10 +1,76 @@
+import { Metadata } from 'next';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
+// 1. ПЪЛНИ SEO И AI МЕТАДАННИ
+export const metadata: Metadata = {
+  title: "Политика за поверителност | БИОЗИД",
+  description: "Политика за поверителност и защита на личните данни (GDPR) на БИОЗИД ЕООД. Информация относно събирането, обработката и съхранението на вашите данни.",
+  alternates: {
+    canonical: "https://biozid.bg/privacy",
+  },
+  openGraph: {
+    title: "Политика за поверителност | БИОЗИД",
+    description: "Политика за поверителност и защита на личните данни (GDPR) на БИОЗИД ЕООД.",
+    url: "https://biozid.bg/privacy",
+    siteName: "БИОЗИД",
+    locale: "bg_BG",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Политика за поверителност | БИОЗИД",
+    description: "Политика за поверителност и защита на личните данни (GDPR) на БИОЗИД ЕООД.",
+  },
+};
+
 export default function PrivacyPage() {
+  // 2. JSON-LD СТРУКТУРИРАНИ ДАННИ ЗА AI БОТОВЕ И GOOGLE
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebPage",
+        "@id": "https://biozid.bg/privacy/#webpage",
+        "url": "https://biozid.bg/privacy",
+        "name": "Политика за поверителност - БИОЗИД ЕООД",
+        "description": "Политика за поверителност и защита на личните данни съгласно Общия регламент относно защитата на данните (GDPR).",
+        "publisher": {
+          "@type": "Organization",
+          "name": "БИОЗИД ЕООД",
+          "url": "https://biozid.bg"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Начало",
+            "item": "https://biozid.bg"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Политика за поверителност",
+            "item": "https://biozid.bg/privacy"
+          }
+        ]
+      }
+    ]
+  };
+
   return (
     <main className="min-h-screen bg-white">
+      {/* Инжектиране на структурираните данни */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       <Navbar />
+
       <div className="pt-32 md:pt-44 pb-20 max-w-4xl mx-auto px-6">
         <h1 className="text-4xl md:text-5xl font-light text-slate-900 mb-10 tracking-tighter">Политика за поверителност</h1>
         

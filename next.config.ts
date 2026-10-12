@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  compress: true, // Включва автоматична компресия за по-бързо зареждане
+  poweredByHeader: false, // Скрива информацията за фреймуърка от потенциални хакерски ботове
+
   images: {
     remotePatterns: [
       {
@@ -10,9 +12,20 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'app.trysoro.com', // За изображения от блога
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.public.blob.vercel-storage.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
-  // Вече сме Full-Stack, не ни трябват статични експорти!
 };
 
 export default nextConfig;

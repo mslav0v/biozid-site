@@ -3,11 +3,11 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { signIn } from "next-auth/react"; // ВАЖНО: Импортираме реалната функция за вход
+import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 export default function AdminLogin() {
-  const [username, setUsername] = useState(''); // Сменихме email на username, за да съвпада с route.ts
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -43,14 +43,25 @@ export default function AdminLogin() {
   return (
     <main className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4">
       
-      <Link href="/" className="absolute top-6 left-6 text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-teal-600 transition flex items-center gap-2">
+      <Link 
+        href="/" 
+        className="absolute top-6 left-6 text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-teal-600 transition flex items-center gap-2"
+        aria-label="Връщане към началната страница"
+      >
         <span>&larr;</span> Към сайта
       </Link>
 
       <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100">
         
         <div className="bg-slate-900 p-8 text-center flex flex-col items-center justify-center border-b-4 border-teal-600">
-          <Image src="/logo.png" alt="БИОЗИД" width={120} height={35} className="brightness-0 invert mb-2" />
+          <Image 
+            src="/logo.png" 
+            alt="БИОЗИД - Административен панел" 
+            width={120} 
+            height={35} 
+            priority
+            className="brightness-0 invert mb-2 h-auto w-auto" 
+          />
           <h1 className="text-white text-xs font-bold uppercase tracking-widest mt-4 opacity-80">Система за управление</h1>
         </div>
 
@@ -58,30 +69,38 @@ export default function AdminLogin() {
           <form onSubmit={handleLogin} className="space-y-6">
             
             {error && (
-              <div className="bg-red-50 text-red-600 p-3 rounded text-xs font-bold border border-red-100 text-center animate-shake">
+              <div 
+                role="alert" 
+                aria-live="polite" 
+                className="bg-red-50 text-red-600 p-3 rounded text-xs font-bold border border-red-100 text-center animate-shake"
+              >
                 {error}
               </div>
             )}
 
             <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Потребителско име</label>
+              <label htmlFor="username" className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Потребителско име</label>
               <input 
+                id="username"
                 type="text" 
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 required
+                autoComplete="username"
                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded outline-none focus:border-teal-500 transition text-sm font-medium text-slate-800"
                 placeholder="admin"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Парола</label>
+              <label htmlFor="password" className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Парола</label>
               <input 
+                id="password"
                 type="password" 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                autoComplete="current-password"
                 className="w-full p-3 bg-slate-50 border border-slate-200 rounded outline-none focus:border-teal-500 transition text-sm font-medium text-slate-800"
                 placeholder="••••••••"
               />

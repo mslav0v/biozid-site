@@ -5,13 +5,15 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("POSTGRES_PRISMA_URL")
+  provider  = "postgresql"
+  url       = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
 }
 
 // Модел за Каталога с Къщи
 model House {
   id               String   @id @default(cuid())
+  slug             String?  @unique // Уникален кратък адрес за SEO (напр. "model-a-75sqm")
   name             String
   area             Float    // Квадратура
   bedrooms         Int      // Брой спални
@@ -25,6 +27,10 @@ model House {
   gallery          String[] // Галерия от допълнителни снимки
   tags             String[] // Тагове (напр. ["Енергоефективна", "Премиум"])
 
+  // SEO ОПТИМИЗАЦИЯ ЗА ГООГЛЕ
+  metaTitle        String?  // Индивидуално SEO заглавие
+  metaDescription  String?  @db.Text // Индивидуално SEO описание
+
   // ТЕХНИЧЕСКИ ХАРАКТЕРИСТИКИ
   constructionType String?  // Вид конструкция (напр. "Масивна метална")
   profileSize      String?  // Размери на профилите (напр. "100х100х5 мм")
@@ -34,36 +40,49 @@ model House {
   windowsType      String?  // Вид дограма (напр. "7-камерна PVC, троен стъклопакет")
 
   createdAt        DateTime @default(now())
-  // ЗАЩИТА: Добавяме default(now()), за да не гърми при съществуващи записи
   updatedAt        DateTime @default(now()) @updatedAt
+
+  @@index([slug])
+  @@index([createdAt])
 }
 
 // Модел за Клиентските заявки от Калкулатора
 model QuoteRequest {
-  id            String   @id @default(cuid())
-  clientName    String
-  clientPhone   String
-  totalArea     Float
-  status        String   @default("new") // new, in_progress, completed
-  underlayUrl   String?  // Линк към качената подложка (чертеж)
-  cadData       Json?    // Тук пазим целия масив със стени и панели за CAD редактора
+  id           String   @id @default(cuid())
+  clientName   String
+  clientPhone  String
+  totalArea    Float
+  status       String   @default("new") // new, in_progress, completed
+  underlayUrl  String?  // Линк към качената подложка (чертеж)
+  cadData      Json?    // Масив със стени и панели за CAD редактора
   
-  // --- НОВО: ПОЛЕ ЗА СЛУЖЕБНИЯ ПАНЕЛ (ЕТАЖИ И ПОДЛОЖКИ) ---
-  floorsData    Json?    // Тук пазим масива с етажите, ppm мащаба и специфичните подложки за всеки етаж
+  // --- ПОЛЕ ЗА СЛУЖЕБНИЯ ПАНЕЛ (ЕТАЖИ И ПОДЛОЖКИ) ---
+  floorsData   Json?    // Масив с етажите, ppm мащаба и специфичните подложки за всеки етаж
   
-  createdAt     DateTime @default(now())
-  // ЗАЩИТА: Добавяме default(now()), за да не гърми при съществуващи записи
-  updatedAt     DateTime @default(now()) @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
 }
+
 // Модел за Блог статии (Автоматизирани през Make.com / Soro.ai)
 model BlogPost {
   id          String   @id @default(cuid())
+  slug        String?  @unique // Уникален кратък адрес за SEO (напр. "zashhto-da-izberem-konopena-kashta")
   title       String
   content     String   @db.Text
   excerpt     String?  @db.Text
   imageUrl    String?
+
+  // SEO ОПТИМИЗАЦИЯ ЗА ГООГЛЕ
+  metaTitle   String?  // Индивидуално SEO заглавие
+  metaDescription String? @db.Text // Индивидуално SEO описание
   
   publishedAt DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
+
+  @@index([slug])
+  @@index([publishedAt])
 }

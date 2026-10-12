@@ -2,7 +2,6 @@ import type { Config } from "tailwindcss";
 import typography from "@tailwindcss/typography";
 
 const config: Config = {
-  // Указваме на Tailwind къде да търси нашите класове
   content: [
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
@@ -11,28 +10,57 @@ const config: Config = {
   ],
   theme: {
     extend: {
-      // Тук дефинираме "Soro" стилистиката
+      // Стилистика за блог статиите и Soro съдържанието
       typography: {
         soro: {
           css: {
-            '--tw-prose-body': '#1a1a1a',
-            '--tw-prose-headings': '#111111',
-            fontSize: '1.2rem',
-            lineHeight: '1.8',
-            maxWidth: '70ch', // Комфортна ширина за четене
-            p: {
-              marginTop: '1.5em',
-              marginBottom: '1.5em',
+            '--tw-prose-body': '#334155', // slate-700
+            '--tw-prose-headings': '#0f172a', // slate-900
+            '--tw-prose-links': '#0f766e', // teal-700
+            fontSize: '1rem',
+            lineHeight: '1.75',
+            maxWidth: '100%',
+            '@media (min-width: 768px)': {
+              fontSize: '1.125rem',
+              lineHeight: '1.8',
             },
-            'h1, h2, h3': {
+            p: {
+              marginTop: '1.25em',
+              marginBottom: '1.25em',
+            },
+            'h1, h2, h3, h4': {
+              color: '#0f172a',
               fontWeight: '700',
               letterSpacing: '-0.02em',
+              marginTop: '1.6em',
+              marginBottom: '0.6em',
+            },
+            a: {
+              color: '#0f766e',
+              textDecoration: 'underline',
+              fontWeight: '600',
+              '&:hover': {
+                color: '#115e59',
+              },
             },
             blockquote: {
               fontWeight: '400',
               fontStyle: 'italic',
-              borderLeftWidth: '3px',
-              borderLeftColor: '#000',
+              borderLeftWidth: '4px',
+              borderLeftColor: '#0f766e',
+              paddingLeft: '1rem',
+              color: '#475569',
+            },
+            img: {
+              borderRadius: '0.75rem',
+              marginTop: '2em',
+              marginBottom: '2em',
+              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+            },
+            hr: {
+              borderColor: '#e2e8f0',
+              marginTop: '3em',
+              marginBottom: '3em',
             },
           },
         },

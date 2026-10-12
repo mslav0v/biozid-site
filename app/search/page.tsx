@@ -1,11 +1,30 @@
+import { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
+
+// 1. ДИНАМИЧНИ МЕТАДАННИ ЗА СТРАНИЦАТА С ТЪРСЕНЕ
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}): Promise<Metadata> {
+  const resolvedParams = await searchParams;
+  const query = resolvedParams.q || '';
+
+  return {
+    title: query ? `Търсене за "${query}" | БИОЗИД` : 'Търсене | БИОЗИД',
+    description: 'Резултати от търсенето в уебсайта на БИОЗИД - сглобяеми конопени къщи, технологии и статии.',
+    robots: {
+      index: false, // Външните търсачки не трябва да индексират резултати от търсене, за да няма дублиран съдържателен отпечатък
+      follow: true,
+    },
+  };
+}
 
 export default async function SearchPage({
   searchParams,
@@ -46,7 +65,7 @@ export default async function SearchPage({
       
       allResults.push(...mappedHouses);
     } catch (error) {
-      console.log("Грешка при търсене на къщи:", error);
+      console.error("Грешка при търсене на къщи:", error);
     }
 
     // 2. ТЪРСЕНЕ В ЛОКАЛНИЯ БЛОГ (Prisma - За всеки случай)
@@ -75,7 +94,6 @@ export default async function SearchPage({
       const soroRes = await fetch('https://app.trysoro.com/api/embed/9956916d-04d4-476a-afc4-0ab6bb82b06d', { cache: 'no-store' });
       const soroText = await soroRes.text();
       
-      // ПОПРАВКА ТУК: Използваме [\s\S] вместо . и махаме /s флага за съвместимост с по-стари ES версии
       const match = soroText.match(/var SORO_ARTICLES\s*=\s*(\[[\s\S]*?\]);/);
       
       if (match && match[1]) {
@@ -91,7 +109,6 @@ export default async function SearchPage({
           id: `soro-${a.id}`,
           title: a.title,
           desc: a.excerpt,
-          // Според кода на Soro, дълбоките линкове работят чрез параметър ?post=slug
           url: `/blog?post=${a.slug}`,
           image: a.image,
           typeLabel: 'Блог Статия'
@@ -100,7 +117,7 @@ export default async function SearchPage({
         allResults.push(...mappedSoro);
       }
     } catch (error) {
-      console.log("Грешка при търсене в Soro:", error);
+      console.error("Грешка при търсене в Soro:", error);
     }
 
     // 4. ТЪРСЕНЕ В СТАТИЧНИТЕ СТРАНИЦИ
@@ -159,8 +176,13 @@ export default async function SearchPage({
                 placeholder="Търси в целия сайт (къщи, статии, коноп, цени)..."
                 className="w-full bg-white border border-slate-200 rounded-2xl px-6 py-4 text-slate-900 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-100 transition-all"
                 required
+                aria-label="Поле за търсене"
               />
-              <button type="submit" className="absolute right-2 md:right-3 p-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors">
+              <button 
+                type="submit" 
+                aria-label="Изпрати търсене"
+                className="absolute right-2 md:right-3 p-2.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors"
+              >
                 <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                 </svg>
@@ -200,10 +222,12 @@ export default async function SearchPage({
                 {/* Снимка (Ако има такава) */}
                 {res.image ? (
                   <div className="relative aspect-[4/3] overflow-hidden bg-slate-100 shrink-0">
-                    <img
+                    <Image
                       src={res.image || '/house-placeholder.jpg'}
                       alt={res.title}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      className="object-cover transition-transform duration-700 group-hover:scale-105"
                     />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
                   </div>

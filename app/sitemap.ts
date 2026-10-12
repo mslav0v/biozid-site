@@ -1,7 +1,5 @@
 import { MetadataRoute } from 'next';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '@/lib/prisma';
 
 // Задължаваме sitemap-а да се генерира динамично, за да хваща новите къщи и статии
 export const dynamic = 'force-dynamic';
@@ -41,7 +39,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     }));
   } catch (error) {
-    console.log('Грешка при зареждане на къщи за sitemap:', error);
+    console.error('Грешка при зареждане на къщи за sitemap:', error);
   }
 
   // 3. ДИНАМИЧНИ СТРАНИЦИ: SORO БЛОГ СТАТИИ
@@ -62,7 +60,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }));
     }
   } catch (error) {
-    console.log('Грешка при зареждане на Soro статии за sitemap:', error);
+    console.error('Грешка при зареждане на Soro статии за sitemap:', error);
   }
 
   // Обединяваме всичко и го връщаме на Google

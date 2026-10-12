@@ -1,10 +1,76 @@
+import { Metadata } from 'next';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
+// 1. ПЪЛНИ SEO И AI МЕТАДАННИ
+export const metadata: Metadata = {
+  title: "Общи условия | БИОЗИД",
+  description: "Общи условия за ползване на уебсайта www.biozid.bg. Информация относно каталожния характер на сайта, авторските права и изпращането на запитвания.",
+  alternates: {
+    canonical: "https://biozid.bg/terms",
+  },
+  openGraph: {
+    title: "Общи условия | БИОЗИД",
+    description: "Общи условия за ползване на уебсайта www.biozid.bg.",
+    url: "https://biozid.bg/terms",
+    siteName: "БИОЗИД",
+    locale: "bg_BG",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Общи условия | БИОЗИД",
+    description: "Общи условия за ползване на уебсайта www.biozid.bg.",
+  },
+};
+
 export default function TermsPage() {
+  // 2. JSON-LD СТРУКТУРИРАНИ ДАННИ ЗА AI БОТОВЕ И GOOGLE
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebPage",
+        "@id": "https://biozid.bg/terms/#webpage",
+        "url": "https://biozid.bg/terms",
+        "name": "Общи условия - БИОЗИД ЕООД",
+        "description": "Общи условия за ползване на уебсайта biozid.bg и онлайн каталога на БИОЗИД ЕООД.",
+        "publisher": {
+          "@type": "Organization",
+          "name": "БИОЗИД ЕООД",
+          "url": "https://biozid.bg"
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Начало",
+            "item": "https://biozid.bg"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Общи условия",
+            "item": "https://biozid.bg/terms"
+          }
+        ]
+      }
+    ]
+  };
+
   return (
     <main className="min-h-screen bg-white">
+      {/* Инжектиране на структурираните данни */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       <Navbar />
+
       <div className="pt-32 md:pt-44 pb-20 max-w-4xl mx-auto px-6">
         <h1 className="text-4xl md:text-5xl font-light text-slate-900 mb-10 tracking-tighter">Общи условия</h1>
         
@@ -60,7 +126,7 @@ export default function TermsPage() {
           </section>
 
           <div className="mt-12 pt-8 border-t border-slate-100 text-sm italic">
-            Последна актуализация: {new Date().toLocaleDateString('bg-BG')} 
+            Последна актуализация: 01.10.2026 г.
           </div>
         </div>
       </div>

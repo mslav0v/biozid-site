@@ -1,8 +1,47 @@
-"use client";
-
+import { Metadata } from 'next';
 import Image from 'next/image';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+
+// 1. ПЪЛНИ SEO И AI МЕТАДАННИ
+export const metadata: Metadata = {
+  title: "Технология и анатомия на сглобяемите конопени къщи | БИОЗИД",
+  description: "Подробна анатомия на многослойната стена и носещата конструкция на БИОЗИД. Вентилирана фасада, конопена изолационна сърцевина и прецизен стоманен скелет.",
+  keywords: [
+    "технология сглобяеми къщи",
+    "анатомия на стена",
+    "конопена изолация",
+    "стоманена конструкция",
+    "панели биозид",
+    "вентилирана фасада",
+    "енергийна ефективност"
+  ],
+  alternates: {
+    canonical: "https://biozid.bg/technology",
+  },
+  openGraph: {
+    title: "Технология и анатомия на сглобяемите конопени къщи | БИОЗИД",
+    description: "Подробна анатомия на стената и носещата конструкция на БИОЗИД.",
+    url: "https://biozid.bg/technology",
+    siteName: "БИОЗИД",
+    locale: "bg_BG",
+    type: "article",
+    images: [
+      {
+        url: "/tech-layers1.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Разрез на стената БИОЗИД",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Технология и анатомия на сглобяемите конопени къщи | БИОЗИД",
+    description: "Подробна анатомия на стената и носещата конструкция на БИОЗИД.",
+    images: ["/tech-layers1.jpg"],
+  },
+};
 
 export default function TechnologyPage() {
   const wallLayers = [
@@ -15,8 +54,60 @@ export default function TechnologyPage() {
     { name: "Двоен гипскартон", desc: "Включително червен пожароустойчив слой Knauf." },
   ];
 
+  // 2. JSON-LD СТРУКТУРИРАНИ ДАННИ ЗА AI БОТОВЕ И GOOGLE
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "TechArticle",
+        "@id": "https://biozid.bg/technology/#article",
+        "headline": "Технология и анатомия на сглобяемите конопени къщи БИОЗИД",
+        "description": "Технологията на БИОЗИД съчетава индустриална прецизност с иновативни материали и многослойна стена.",
+        "url": "https://biozid.bg/technology",
+        "image": "https://biozid.bg/tech-layers1.jpg",
+        "author": {
+          "@type": "Organization",
+          "name": "БИОЗИД ЕООД",
+          "url": "https://biozid.bg"
+        },
+        "publisher": {
+          "@type": "Organization",
+          "name": "БИОЗИД ЕООД",
+          "url": "https://biozid.bg",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://biozid.bg/logo.png"
+          }
+        }
+      },
+      {
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+          {
+            "@type": "ListItem",
+            "position": 1,
+            "name": "Начало",
+            "item": "https://biozid.bg"
+          },
+          {
+            "@type": "ListItem",
+            "position": 2,
+            "name": "Технология",
+            "item": "https://biozid.bg/technology"
+          }
+        ]
+      }
+    ]
+  };
+
   return (
     <main className="min-h-screen bg-slate-50">
+      {/* Инжектиране на структурираните данни в HTML */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
       <Navbar />
 
       <div className="pt-28 md:pt-44 pb-20">
@@ -42,6 +133,8 @@ export default function TechnologyPage() {
                 src="/tech-layers1.jpg" 
                 alt="Разрез на стената БИОЗИД" 
                 fill 
+                priority
+                sizes="(max-width: 1024px) 100vw, 50vw"
                 className="object-contain md:object-cover mix-blend-multiply" 
               />
             </div>
