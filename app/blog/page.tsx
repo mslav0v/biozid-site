@@ -5,6 +5,18 @@ import Script from 'next/script';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import prisma from '@/lib/prisma';
+// Казваме на Next.js да НЕ генерира тази страница статично по време на билд
+export const dynamic = 'force-dynamic';
+
+export default async function AdminBlogPage() {
+  const posts = await prisma.blogPost.findMany({
+    orderBy: { publishedAt: 'desc' },
+  });
+
+  return (
+    // ... останалото съдържание на страницата
+  );
+}
 
 // Автоматично обновяване на кеша на всеки 2 часа (7200 секунди)
 export const revalidate = 7200;
