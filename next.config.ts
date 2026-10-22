@@ -26,6 +26,23 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+
+  async redirects() {
+    return [
+      {
+        source: '/blog',
+        has: [
+          {
+            type: 'query',
+            key: 'post',
+            value: '(?<slug>.*)',
+          },
+        ],
+        destination: '/blog/:slug',
+        permanent: true, // Това указва на Google да прехвърли целия SEO авторитет към новия адрес
+      },
+    ];
+  },
 };
 
 export default nextConfig;
