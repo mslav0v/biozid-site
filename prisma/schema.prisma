@@ -5,9 +5,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("POSTGRES_PRISMA_URL")
-  directUrl = env("POSTGRES_URL_NON_POOLING")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // Модел за Каталога с Къщи
@@ -68,20 +67,20 @@ model QuoteRequest {
 
 // Модел за Блог статии (Автоматизирани през Make.com / Soro.ai)
 model BlogPost {
-  id          String   @id @default(cuid())
-  slug        String?  @unique // Уникален кратък адрес за SEO (напр. "zashhto-da-izberem-konopena-kashta")
-  title       String
-  content     String   @db.Text
-  excerpt     String?  @db.Text
-  imageUrl    String?
+  id              String   @id @default(cuid())
+  slug            String?  @unique // Уникален кратък адрес за SEO (напр. "zashhto-da-izberem-konopena-kashta")
+  title           String
+  content         String   @db.Text
+  excerpt         String?  @db.Text
+  imageUrl        String?
 
   // SEO ОПТИМИЗАЦИЯ ЗА ГООГЛЕ
-  metaTitle   String?  // Индивидуално SEO заглавие
-  metaDescription String? @db.Text // Индивидуално SEO описание
+  metaTitle       String?  // Индивидуално SEO заглавие
+  metaDescription String?  @db.Text // Индивидуално SEO описание
   
-  publishedAt DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @default(now()) @updatedAt
+  publishedAt     DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
 
   @@index([slug])
   @@index([publishedAt])
