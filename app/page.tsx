@@ -34,13 +34,14 @@ export default function Home() {
           </div>
         </div>
 
-        {/* HERO ИЗОБРАЖЕНИЕ (Заменено видео с бързо, SEO оптимизирано изображение) */}
+        {/* HERO ИЗОБРАЖЕНИЕ */}
         <div className="w-full lg:w-1/2 relative aspect-[4/3] sm:aspect-[16/10] lg:aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl border border-slate-100">
           <Image 
             src="/exterior-hero.jpg" 
             alt="БИОЗИД - Модерни сглобяеми екологични къщи с конопена изолация" 
             fill 
-            priority
+            priority // Задържаме priority за LCP
+            quality={85}
             sizes="(max-width: 1024px) 100vw, 50vw"
             className="object-cover"
           />
@@ -55,6 +56,7 @@ export default function Home() {
               src="/tech-panel-layer.jpg" 
               alt="БИОЗИД Технология Панели" 
               fill 
+              quality={80}
               sizes="(max-width: 1024px) 100vw, 50vw"
               className="object-cover" 
             />
@@ -85,7 +87,8 @@ export default function Home() {
       <section className="py-16 md:py-32 px-4 md:px-6 max-w-[1400px] mx-auto">
         <div className="grid lg:grid-cols-2 gap-10 md:gap-32 items-center">
           <div className="order-2 lg:order-1 text-center lg:text-left">
-            <h4 className="text-[10px] font-bold tracking-[0.3em] uppercase text-teal-700 mb-4 md:mb-8">Инженерство</h4>
+            {/* Одит: Променено от h4 на h3 заради SEO йерархията */}
+            <h3 className="text-[10px] font-bold tracking-[0.3em] uppercase text-teal-700 mb-4 md:mb-8">Инженерство</h3>
             <h2 className="text-3xl md:text-5xl font-light tracking-tighter mb-6 md:mb-8 leading-tight">Прецизен метален скелет</h2>
             <p className="text-base md:text-lg text-slate-600 font-light leading-relaxed mb-8 md:mb-12 px-2 sm:px-0">
               Използваме висококачествена стомана, разкроена с компютърна точност. Всеки детайл е номериран и подготвен за светкавичен монтаж, гарантирайки устойчивост на земетресения и перфектна геометрия.
@@ -99,6 +102,7 @@ export default function Home() {
               src="/tech-frames.jpg" 
               alt="БИОЗИД Метална Конструкция" 
               fill 
+              quality={80}
               sizes="(max-width: 1024px) 100vw, 50vw"
               className="object-cover" 
             />
@@ -114,12 +118,14 @@ export default function Home() {
               src="/tech-facade.jpg" 
               alt="БИОЗИД Вентилирана Фасада" 
               fill 
+              quality={80}
               sizes="(max-width: 1024px) 100vw, 50vw"
               className="object-cover opacity-80" 
             />
           </div>
           <div className="order-2 text-center lg:text-left">
-            <h4 className="text-[10px] font-bold tracking-[0.4em] uppercase text-teal-400 mb-4 md:mb-8">Материали</h4>
+            {/* Одит: Променено от h4 на h3 заради SEO йерархията */}
+            <h3 className="text-[10px] font-bold tracking-[0.4em] uppercase text-teal-400 mb-4 md:mb-8">Материали</h3>
             <h2 className="text-3xl md:text-5xl lg:text-6xl font-extralight tracking-tighter mb-6 md:mb-10 leading-tight">50 години гаранция</h2>
             <p className="text-base md:text-xl font-light text-slate-300 leading-relaxed mb-8 md:mb-12 px-2 sm:px-0">
               Окачена фасада позволяваща на къщата да диша и в същото време има елегантен дизайн с ефект на дърво и черен мат. Нашата окачена фасада е устойчива на най-тежките метеорологични условия, не изисква поддръжка и запазва цветовете си десетилетия наред.

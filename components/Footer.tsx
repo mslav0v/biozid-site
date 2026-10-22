@@ -17,7 +17,8 @@ export default function Footer() {
               className="grayscale opacity-80 hover:opacity-100 transition-opacity" 
             />
           </Link>
-          <p className="text-[10px] font-bold tracking-[0.25em] uppercase text-slate-400 text-center md:text-left">
+          {/* Одит: Променен text-slate-400 на text-slate-500 за по-висок цветови контраст (Accessibility) */}
+          <p className="text-[10px] font-bold tracking-[0.25em] uppercase text-slate-500 text-center md:text-left">
             &copy; {new Date().getFullYear()} БИОЗИД ЕООД. Всички права запазени.
           </p>
         </div>
@@ -87,7 +88,7 @@ export default function Footer() {
         </div>
 
         {/* ЮРИДИЧЕСКИ ЛИНКОВЕ */}
-        <div className="flex gap-6 text-[10px] font-bold tracking-widest uppercase text-slate-400">
+        <div className="flex gap-6 text-[10px] font-bold tracking-widest uppercase text-slate-500">
           <Link href="/privacy" className="hover:text-teal-700 transition-colors">Политика за поверителност</Link>
           <Link href="/terms" className="hover:text-teal-700 transition-colors">Условия за ползване</Link>
         </div>

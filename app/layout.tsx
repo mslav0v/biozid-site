@@ -160,16 +160,20 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col bg-white text-slate-900">
-        {/* --- GOOGLE ANALYTICS (GA4) --- */}
+        
+        {/* Съдържанието на сайта */}
+        {children}
+
+        {/* --- GOOGLE ANALYTICS (GA4) - Преместено най-долу с lazyOnload за по-бърз LCP --- */}
         {process.env.NEXT_PUBLIC_GA_ID && (
           <>
             <Script
-              strategy="afterInteractive"
+              strategy="lazyOnload" // Променено от afterInteractive на lazyOnload
               src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`}
             />
             <Script
               id="google-analytics"
-              strategy="afterInteractive"
+              strategy="lazyOnload" // Променено от afterInteractive на lazyOnload
               dangerouslySetInnerHTML={{
                 __html: `
                   window.dataLayer = window.dataLayer || [];
@@ -183,9 +187,6 @@ export default function RootLayout({
             />
           </>
         )}
-
-        {/* Съдържанието на сайта */}
-        {children}
       </body>
     </html>
   );
