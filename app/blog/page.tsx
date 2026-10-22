@@ -107,9 +107,11 @@ export default async function BlogPage() {
         'blogPost': soroArticles.map((article) => ({
           '@type': 'BlogPosting',
           'headline': article.title,
-          'url': `https://biozid.bg/blog?post=${article.slug}`,
+          // SEO ФИКС: Променено от ?post=slug към чист SEO URL
+          'url': `https://biozid.bg/blog/${article.slug}`,
           'datePublished': article.published_at || new Date().toISOString(),
-          'mainEntityOfPage': `https://biozid.bg/blog?post=${article.slug}`
+          // SEO ФИКС: Променено от ?post=slug към чист SEO URL
+          'mainEntityOfPage': `https://biozid.bg/blog/${article.slug}`
         }))
       },
       {
@@ -162,7 +164,8 @@ export default async function BlogPage() {
               <ul className="space-y-2">
                 {soroArticles.map((art) => (
                   <li key={art.slug}>
-                    <a href={`/blog?post=${art.slug}`} className="text-teal-700 underline font-medium">
+                    {/* SEO ФИКС: Променено от ?post=slug към чист SEO URL */}
+                    <a href={`/blog/${art.slug}`} className="text-teal-700 underline font-medium">
                       {art.title}
                     </a>
                   </li>
@@ -208,7 +211,8 @@ export default async function BlogPage() {
                 houses.map((house) => (
                   <Link 
                     key={house.id} 
-                    href={`/houses/${house.id}`} 
+                    // Проверка за SEO slug при къщите, ако е наличен
+                    href={`/houses/${house.slug || house.id}`} 
                     className="group block overflow-hidden"
                   >
                     <div className="relative aspect-[16/10] overflow-hidden rounded-lg bg-slate-100 mb-3">

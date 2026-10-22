@@ -21,8 +21,14 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { id } = await params;
 
-  const post = await prisma.blogPost.findUnique({
-    where: { id: id }
+  // Търсим по id ИЛИ по slug, за да сме сигурни, че намираме статията
+  const post = await prisma.blogPost.findFirst({
+    where: { 
+      OR: [
+        { id: id },
+        { slug: id }
+      ]
+    }
   });
 
   if (!post) {
@@ -33,11 +39,13 @@ export async function generateMetadata({
 
   const description = cleanDescription(post.content);
   const imageUrl = post.imageUrl || 'https://biozid.bg/og-image.jpg';
-  const articleUrl = `https://biozid.bg/blog/${id}`;
+  // SEO ФИКС: Уверяваме се, че генерираме каноничния URL с чистия slug
+  const articleUrl = `https://biozid.bg/blog/${post.slug || post.id}`;
 
   return {
     title: `${post.title} | Блог БИОЗИД`,
     description,
+    // SEO ФИКС: Това решава проблема "Duplicate without user-selected canonical"
     alternates: {
       canonical: articleUrl,
     },
@@ -74,9 +82,14 @@ export default async function SinglePostPage({
 }) {
   const { id } = await params;
 
-  // Взимаме статията от базата данни
-  const post = await prisma.blogPost.findUnique({
-    where: { id: id }
+  // Взимаме статията от базата данни (търсим и по id, и по slug)
+  const post = await prisma.blogPost.findFirst({
+    where: { 
+      OR: [
+        { id: id },
+        { slug: id }
+      ]
+    }
   });
 
   if (!post) notFound();
@@ -87,7 +100,7 @@ export default async function SinglePostPage({
 
   const description = cleanDescription(post.content);
   const imageUrl = post.imageUrl || 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc';
-  const articleUrl = `https://biozid.bg/blog/${id}`;
+  const articleUrl = `https://biozid.bg/blog/${post.slug || post.id}`;
 
   // 2. JSON-LD СТРУКТУРИРАНИ ДАННИ ЗА AI БОТОВЕ И GOOGLE RICH RESULTS
   const jsonLd = {
@@ -193,6 +206,22 @@ export default async function SinglePostPage({
             className="prose prose-slate lg:prose-lg max-w-none prose-img:rounded-lg prose-a:text-teal-600 hover:prose-a:text-teal-700"
             dangerouslySetInnerHTML={{ __html: post.content }}
           />
+          
+          {/* SEO ВЪТРЕШНО ЛИНКВАНЕ: Добавено директно под статията за прехвърляне на авторитет */}
+          <div className="mt-16 p-8 bg-slate-50 rounded-xl border border-slate-100 text-center">
+            <h3 className="text-xl font-bold text-slate-900 mb-4">Заинтересовани ли сте от екологично строителство?</h3>
+            <p className="text-slate-600 mb-6 max-w-lg mx-auto">
+              Разгледайте нашите модели сглобяеми къщи, изградени със здрава метална конструкция и дишащи конопени панели.
+            </p>
+            <div className="flex flex-col sm:flex-row justify-center gap-4">
+              <Link href="/houses" className="bg-teal-700 text-white px-8 py-3 rounded text-sm font-bold uppercase tracking-wider hover:bg-teal-600 transition">
+                Вижте Моделите
+              </Link>
+              <Link href="/calculator" className="bg-slate-900 text-white px-8 py-3 rounded text-sm font-bold uppercase tracking-wider hover:bg-slate-800 transition">
+                Калкулатор Цени
+              </Link>
+            </div>
+          </div>
         </div>
       </main>
 
