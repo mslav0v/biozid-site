@@ -1,3 +1,4 @@
+// app/blog/page.tsx
 import { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -6,15 +7,14 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import prisma from '@/lib/prisma';
 
-// Казваме на Next.js да НЕ генерира тази страница статично по време на билд при липса на база/кеш
 export const dynamic = 'force-dynamic';
-
-// Автоматично обновяване на кеша на всеки 2 часа (7200 секунди)
 export const revalidate = 7200;
 
 // 1. ДИНАМИЧНИ SEO И AI МЕТАДАННИ (За прихващане на ?post= параметъра)
 export async function generateMetadata({ searchParams }: any): Promise<Metadata> {
-  const postSlug = searchParams?.post;
+  // SEO ФИКС: Изчакваме searchParams асинхронно, задължително за по-нови версии на Next.js
+  const params = await searchParams;
+  const postSlug = params?.post;
   
   const canonicalUrl = postSlug 
     ? `https://biozid.bg/blog?post=${postSlug}` 
@@ -72,12 +72,10 @@ async function getSoroArticles(): Promise<SoroArticle[]> {
 }
 
 export default async function BlogPage() {
-  // 1. Взимаме моделите къщи за страничната лента от Prisma
   const houses = await prisma.house.findMany({
-    take: 4, // Показваме 4-те най-популярни или нови модела
+    take: 4, 
   });
 
-  // 2. Взимаме Soro статиите за изграждане на JSON-LD микроданни за AI ботове
   const soroArticles = await getSoroArticles();
 
   const tags = [
@@ -93,7 +91,6 @@ export default async function BlogPage() {
     'модулни къщи'
   ];
 
-  // 3. ГЕНЕРИРАНЕ НА JSON-LD СТРУКТУРИРАНИ ДАННИ (SCHEMA.ORG) ЗА AI БОТОВЕ
   const jsonLd = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -112,10 +109,8 @@ export default async function BlogPage() {
         'blogPost': soroArticles.map((article) => ({
           '@type': 'BlogPosting',
           'headline': article.title,
-          // SEO ФИКС: Връщаме формата с ?post=slug за синхронизация
           'url': `https://biozid.bg/blog?post=${article.slug}`,
           'datePublished': article.published_at || new Date().toISOString(),
-          // SEO ФИКС: Връщаме формата с ?post=slug за синхронизация
           'mainEntityOfPage': `https://biozid.bg/blog?post=${article.slug}`
         }))
       },
@@ -141,7 +136,6 @@ export default async function BlogPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-white font-sans">
-      {/* Инжектиране на структурираните данни в HTML HEAD */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -151,7 +145,6 @@ export default async function BlogPage() {
 
       <main className="flex-1 pt-40 pb-20 px-6 max-w-[1300px] mx-auto w-full flex flex-col lg:flex-row gap-16">
         
-        {/* ЛЯВА КОЛОНА - Управлява се от Soro */}
         <div className="flex-1 flex flex-col">
           <div className="mb-8">
             <h1 className="text-5xl font-serif font-bold text-slate-900 mb-4">Блог</h1>
@@ -159,17 +152,14 @@ export default async function BlogPage() {
           </div>
 
           <div id="soro-blog" className="min-h-[600px]">
-            {/* Тук Soro инжектира съдържанието за потребителя */}
           </div>
 
-          {/* Семантичен списък за AI и търсачки, ако JS не се изпълни */}
           <noscript>
             <div className="my-8 p-6 bg-slate-50 rounded-lg">
               <h2 className="text-xl font-bold mb-4">Публикувани статии:</h2>
               <ul className="space-y-2">
                 {soroArticles.map((art) => (
                   <li key={art.slug}>
-                    {/* SEO ФИКС: Връщаме формата с ?post=slug */}
                     <a href={`/blog?post=${art.slug}`} className="text-teal-700 underline font-medium">
                       {art.title}
                     </a>
@@ -179,17 +169,14 @@ export default async function BlogPage() {
             </div>
           </noscript>
 
-          {/* Динамично зареждане на Soro скрипта */}
           <Script 
             src="https://app.trysoro.com/api/embed/9956916d-04d4-476a-afc4-0ab6bb82b06d"
             strategy="afterInteractive"
           />
         </div>
 
-        {/* ДЯСНА КОЛОНА (SIDEBAR) */}
         <aside className="w-full lg:w-[300px] shrink-0 flex flex-col gap-12 lg:sticky lg:top-32 h-fit">
           
-          {/* ТЪРСЕНЕ */}
           <div>
             <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-6">Търсене</h3>
             <form action="/search" method="GET" className="relative border-b border-slate-200 pb-2 focus-within:border-teal-500 transition-colors">
@@ -206,7 +193,6 @@ export default async function BlogPage() {
             </form>
           </div>
 
-          {/* МОДЕЛИ КЪЩИ */}
           <div>
             <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-6">Нашите Къщи</h3>
             <div className="flex flex-col gap-8">
@@ -238,7 +224,6 @@ export default async function BlogPage() {
               )}
             </div>
             
-            {/* Бутон към цялата страница с къщи */}
             <Link 
               href="/houses" 
               className="block text-center mt-6 py-3 border border-slate-200 text-xs font-black uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all rounded"
@@ -247,7 +232,6 @@ export default async function BlogPage() {
             </Link>
           </div>
 
-          {/* ТАГОВЕ */}
           <div>
             <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-6">Тагове</h3>
             <div className="flex flex-wrap gap-x-4 gap-y-2">

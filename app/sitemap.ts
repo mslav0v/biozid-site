@@ -1,12 +1,34 @@
 // app/sitemap.ts
 import { MetadataRoute } from 'next';
-import prisma from '@/lib/prisma'; // Уверете се, че пътят до Prisma клиента е правилен за вашия проект
+import prisma from '@/lib/prisma'; 
 
-// Задължаваме sitemap-а да се генерира динамично, за да хваща новите къщи и статии
 export const dynamic = 'force-dynamic';
 
+interface SoroArticle {
+  title: string;
+  slug: string;
+  published_at?: string;
+  description?: string;
+}
+
+// Помощна функция: Взимаме статиите директно от Soro, за да гарантираме правилните slugs
+async function getSoroArticles(): Promise<SoroArticle[]> {
+  try {
+    const res = await fetch('https://app.trysoro.com/api/embed/9956916d-04d4-476a-afc4-0ab6bb82b06d', {
+      next: { revalidate: 7200 }
+    });
+    const text = await res.text();
+    const match = text.match(/var SORO_ARTICLES\s*=\s*(\[[\s\S]*?\]);/);
+    if (match && match[1]) {
+      return JSON.parse(match[1]);
+    }
+  } catch (error) {
+    console.error('Грешка при зареждане на Soro статии за sitemap:', error);
+  }
+  return [];
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  // Главният URL на твоя сайт
   const baseUrl = 'https://biozid.bg';
 
   // 1. СТАТИЧНИ СТРАНИЦИ
@@ -23,19 +45,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     url: `${baseUrl}${route}`,
     lastModified: new Date(),
     changeFrequency: 'weekly' as const,
-    priority: route === '' ? 1.0 : 0.8, // Началната страница е с най-висок приоритет
+    priority: route === '' ? 1.0 : 0.8,
   }));
 
   // 2. ДИНАМИЧНИ СТРАНИЦИ: МОДЕЛИ КЪЩИ (От Prisma)
   let houseRoutes: MetadataRoute.Sitemap = [];
   try {
     const houses = await prisma.house.findMany({
-      // Извличаме slug за SEO адреса и updatedAt за датата на последна промяна
       select: { slug: true, id: true, updatedAt: true }
     });
     
     houseRoutes = houses.map((house) => ({
-      // Ако по някаква причина slug липсва, ползваме id като резервен вариант
       url: `${baseUrl}/houses/${house.slug || house.id}`,
       lastModified: house.updatedAt,
       changeFrequency: 'monthly' as const,
@@ -45,18 +65,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.error('Грешка при зареждане на къщи за sitemap:', error);
   }
 
-  // 3. ДИНАМИЧНИ СТРАНИЦИ: БЛОГ СТАТИИ (От Prisma)
+  // 3. ДИНАМИЧНИ СТРАНИЦИ: БЛОГ СТАТИИ (От Soro)
   let blogRoutes: MetadataRoute.Sitemap = [];
   try {
-    // Извличаме статиите директно от нашата база данни, където Make.com ги записва
-    const posts = await prisma.blogPost.findMany({
-      select: { slug: true, id: true, updatedAt: true }
-    });
+    const soroArticles = await getSoroArticles();
 
-    blogRoutes = posts.map((post) => ({
-      // SEO ФИКС: Подаваме адреса с ?post= към Google, за да съвпада със Soro скрипта
-      url: `${baseUrl}/blog?post=${post.slug || post.id}`,
-      lastModified: post.updatedAt,
+    blogRoutes = soroArticles.map((article) => ({
+      url: `${baseUrl}/blog?post=${article.slug}`,
+      lastModified: article.published_at ? new Date(article.published_at) : new Date(),
       changeFrequency: 'weekly' as const,
       priority: 0.6,
     }));
@@ -64,6 +80,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     console.error('Грешка при зареждане на блог статии за sitemap:', error);
   }
 
-  // Обединяваме всичко и го връщаме на Google
   return [...staticRoutes, ...houseRoutes, ...blogRoutes];
 }
