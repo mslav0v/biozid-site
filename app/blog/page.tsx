@@ -12,35 +12,40 @@ export const dynamic = 'force-dynamic';
 // Автоматично обновяване на кеша на всеки 2 часа (7200 секунди)
 export const revalidate = 7200;
 
-// 1. ПЪЛНИ SEO И AI МЕТАДАННИ
-export const metadata: Metadata = {
-  title: 'Блог | Екологично строителство и конопени къщи | БИОЗИД',
-  description: 'Идеи, иновации и съвети за модерното и екологично строителство с конопени панели. Научете повече за паропропускливите и енергийно ефективни сглобяеми къщи.',
-  keywords: [
-    'Еко строителство',
-    'Панели БИОЗИД',
-    'Евтини сглобяеми къщи',
-    'Здравословен дом',
-    'Сглобяеми къщи',
-    'Енергийна ефективност',
-    'пасивни къщи',
-    'мобилни къщи',
-    'бързо строителство',
-    'модулни къщи',
-    'конопена изолация'
-  ],
-  alternates: {
-    canonical: 'https://biozid.bg/blog',
-  },
-  openGraph: {
-    title: 'Блог за екологично строителство и конопени къщи | БИОЗИД',
-    description: 'Идеи, иновации и съвети за модерното и екологично строителство с конопени панели.',
-    url: 'https://biozid.bg/blog',
-    siteName: 'БИОЗИД',
-    locale: 'bg_BG',
-    type: 'website',
-  },
-};
+// 1. ДИНАМИЧНИ SEO И AI МЕТАДАННИ (За прихващане на ?post= параметъра)
+export async function generateMetadata({ searchParams }: any): Promise<Metadata> {
+  const postSlug = searchParams?.post;
+  
+  const canonicalUrl = postSlug 
+    ? `https://biozid.bg/blog?post=${postSlug}` 
+    : 'https://biozid.bg/blog';
+
+  const title = postSlug 
+    ? 'Блог Статия | БИОЗИД' 
+    : 'Блог | Екологично строителство и конопени къщи | БИОЗИД';
+
+  return {
+    title: title,
+    description: 'Идеи, иновации и съвети за модерното и екологично строителство с конопени панели. Научете повече за паропропускливите и енергийно ефективни сглобяеми къщи.',
+    keywords: [
+      'Еко строителство', 'Панели БИОЗИД', 'Евтини сглобяеми къщи',
+      'Здравословен дом', 'Сглобяеми къщи', 'Енергийна ефективност',
+      'пасивни къщи', 'мобилни къщи', 'бързо строителство',
+      'модулни къщи', 'конопена изолация'
+    ],
+    alternates: {
+      canonical: canonicalUrl,
+    },
+    openGraph: {
+      title: title,
+      description: 'Идеи, иновации и съвети за модерното и екологично строителство с конопени панели.',
+      url: canonicalUrl,
+      siteName: 'БИОЗИД',
+      locale: 'bg_BG',
+      type: 'website',
+    },
+  };
+}
 
 interface SoroArticle {
   title: string;
@@ -107,11 +112,11 @@ export default async function BlogPage() {
         'blogPost': soroArticles.map((article) => ({
           '@type': 'BlogPosting',
           'headline': article.title,
-          // SEO ФИКС: Променено от ?post=slug към чист SEO URL
-          'url': `https://biozid.bg/blog/${article.slug}`,
+          // SEO ФИКС: Връщаме формата с ?post=slug за синхронизация
+          'url': `https://biozid.bg/blog?post=${article.slug}`,
           'datePublished': article.published_at || new Date().toISOString(),
-          // SEO ФИКС: Променено от ?post=slug към чист SEO URL
-          'mainEntityOfPage': `https://biozid.bg/blog/${article.slug}`
+          // SEO ФИКС: Връщаме формата с ?post=slug за синхронизация
+          'mainEntityOfPage': `https://biozid.bg/blog?post=${article.slug}`
         }))
       },
       {
@@ -164,8 +169,8 @@ export default async function BlogPage() {
               <ul className="space-y-2">
                 {soroArticles.map((art) => (
                   <li key={art.slug}>
-                    {/* SEO ФИКС: Променено от ?post=slug към чист SEO URL */}
-                    <a href={`/blog/${art.slug}`} className="text-teal-700 underline font-medium">
+                    {/* SEO ФИКС: Връщаме формата с ?post=slug */}
+                    <a href={`/blog?post=${art.slug}`} className="text-teal-700 underline font-medium">
                       {art.title}
                     </a>
                   </li>
@@ -211,7 +216,6 @@ export default async function BlogPage() {
                 houses.map((house) => (
                   <Link 
                     key={house.id} 
-                    // Проверка за SEO slug при къщите, ако е наличен
                     href={`/houses/${house.slug || house.id}`} 
                     className="group block overflow-hidden"
                   >

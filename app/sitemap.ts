@@ -54,8 +54,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
 
     blogRoutes = posts.map((post) => ({
-      // Генерираме красив SEO адрес: /blog/slug-na-statiqta
-      url: `${baseUrl}/blog/${post.slug || post.id}`,
+      // SEO ФИКС: Подаваме адреса с ?post= към Google, за да съвпада със Soro скрипта
+      url: `${baseUrl}/blog?post=${post.slug || post.id}`,
       lastModified: post.updatedAt,
       changeFrequency: 'weekly' as const,
       priority: 0.6,
