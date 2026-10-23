@@ -1,7 +1,6 @@
 import { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import Script from 'next/script';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import prisma from '@/lib/prisma';
@@ -42,38 +41,25 @@ export const metadata: Metadata = {
   },
 };
 
-interface SoroArticle {
-  title: string;
-  slug: string;
-  published_at?: string;
-  description?: string;
-}
-
-// Помощна функция за сървърно извличане на Soro статиите за Schema.org
-async function getSoroArticles(): Promise<SoroArticle[]> {
-  try {
-    const res = await fetch('https://app.trysoro.com/api/embed/9956916d-04d4-476a-afc4-0ab6bb82b06d', {
-      next: { revalidate: 7200 }
-    });
-    const text = await res.text();
-    const match = text.match(/var SORO_ARTICLES\s*=\s*(\[[\s\S]*?\]);/);
-    if (match && match[1]) {
-      return JSON.parse(match[1]);
-    }
-  } catch (error) {
-    console.error('Грешка при зареждане на Soro статии за Schema:', error);
-  }
-  return [];
-}
-
 export default async function BlogPage() {
   // 1. Взимаме моделите къщи за страничната лента от Prisma
   const houses = await prisma.house.findMany({
-    take: 4, // Показваме 4-те най-популярни или нови модела
+    take: 4, 
+    orderBy: { createdAt: 'desc' }
   });
 
-  // 2. Взимаме Soro статиите за изграждане на JSON-LD микроданни за AI ботове
-  const soroArticles = await getSoroArticles();
+  // 2. Взимаме ВСИЧКИ статии директно от нашата база данни (Prisma), вместо от външно API
+  const posts = await prisma.blogPost.findMany({
+    orderBy: { publishedAt: 'desc' },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      excerpt: true,
+      imageUrl: true,
+      publishedAt: true,
+    }
+  });
 
   const tags = [
     'Еко строителство',
@@ -88,7 +74,7 @@ export default async function BlogPage() {
     'модулни къщи'
   ];
 
-  // 3. ГЕНЕРИРАНЕ НА JSON-LD СТРУКТУРИРАНИ ДАННИ (SCHEMA.ORG) ЗА AI БОТОВЕ
+  // 3. ГЕНЕРИРАНЕ НА JSON-LD СТРУКТУРИРАНИ ДАННИ (SCHEMA.ORG)
   const jsonLd = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -104,14 +90,12 @@ export default async function BlogPage() {
           'url': 'https://biozid.bg',
           'logo': 'https://biozid.bg/logo.png'
         },
-        'blogPost': soroArticles.map((article) => ({
+        'blogPost': posts.map((post) => ({
           '@type': 'BlogPosting',
-          'headline': article.title,
-          // SEO ФИКС: Променено от ?post=slug към чист SEO URL
-          'url': `https://biozid.bg/blog/${article.slug}`,
-          'datePublished': article.published_at || new Date().toISOString(),
-          // SEO ФИКС: Променено от ?post=slug към чист SEO URL
-          'mainEntityOfPage': `https://biozid.bg/blog/${article.slug}`
+          'headline': post.title,
+          'url': `https://biozid.bg/blog/${post.slug || post.id}`,
+          'datePublished': new Date(post.publishedAt).toISOString(),
+          'mainEntityOfPage': `https://biozid.bg/blog/${post.slug || post.id}`
         }))
       },
       {
@@ -136,7 +120,6 @@ export default async function BlogPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-white font-sans">
-      {/* Инжектиране на структурираните данни в HTML HEAD */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -146,39 +129,49 @@ export default async function BlogPage() {
 
       <main className="flex-1 pt-40 pb-20 px-6 max-w-[1300px] mx-auto w-full flex flex-col lg:flex-row gap-16">
         
-        {/* ЛЯВА КОЛОНА - Управлява се от Soro */}
+        {/* ЛЯВА КОЛОНА - Списък със статии (Рендиран локално) */}
         <div className="flex-1 flex flex-col">
-          <div className="mb-8">
-            <h1 className="text-5xl font-serif font-bold text-slate-900 mb-4">Блог</h1>
-            <p className="text-slate-500 text-lg max-w-md">Идеи, иновации и съвети за модерното и екологично строителство.</p>
+          <div className="mb-12 border-b border-slate-100 pb-8">
+            <h1 className="text-4xl md:text-5xl font-serif font-bold text-slate-900 mb-4 tracking-tight">Нашият Блог</h1>
+            <p className="text-slate-500 text-lg max-w-xl font-light">Открийте идеи, иновации и полезни съвети за модерното екологично строителство и здравословния начин на живот.</p>
           </div>
 
-          <div id="soro-blog" className="min-h-[600px]">
-            {/* Тук Soro инжектира съдържанието за потребителя */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {posts.length === 0 ? (
+              <p className="text-slate-500 italic col-span-full py-10">Все още няма публикувани статии. Очаквайте скоро!</p>
+            ) : (
+              posts.map((post) => (
+                <article key={post.id} className="group flex flex-col h-full bg-white rounded-2xl overflow-hidden border border-slate-100 hover:shadow-xl hover:border-slate-200 transition-all duration-300">
+                  <Link href={`/blog/${post.slug || post.id}`} className="block relative aspect-[16/10] overflow-hidden bg-slate-100">
+                    <Image 
+                      src={post.imageUrl || '/og-image.jpg'} 
+                      alt={post.title}
+                      fill
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                      className="object-cover transition-transform duration-700 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-black/5 group-hover:bg-black/0 transition-colors" />
+                  </Link>
+                  <div className="p-6 flex flex-col flex-1">
+                    <div className="text-[10px] font-bold tracking-widest uppercase text-teal-600 mb-3">
+                      {new Date(post.publishedAt).toLocaleDateString('bg-BG', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </div>
+                    <Link href={`/blog/${post.slug || post.id}`} className="block mb-3">
+                      <h2 className="text-xl font-bold text-slate-900 leading-snug group-hover:text-teal-700 transition-colors line-clamp-2">
+                        {post.title}
+                      </h2>
+                    </Link>
+                    <p className="text-slate-600 text-sm leading-relaxed mb-6 line-clamp-3 flex-1 font-light">
+                      {post.excerpt || 'Прочетете цялата статия в нашия блог...'}
+                    </p>
+                    <Link href={`/blog/${post.slug || post.id}`} className="mt-auto inline-flex items-center text-xs font-bold uppercase tracking-widest text-slate-900 group-hover:text-teal-700 transition-colors">
+                      Прочети повече <span className="ml-2 transition-transform group-hover:translate-x-1">→</span>
+                    </Link>
+                  </div>
+                </article>
+              ))
+            )}
           </div>
-
-          {/* Семантичен списък за AI и търсачки, ако JS не се изпълни */}
-          <noscript>
-            <div className="my-8 p-6 bg-slate-50 rounded-lg">
-              <h2 className="text-xl font-bold mb-4">Публикувани статии:</h2>
-              <ul className="space-y-2">
-                {soroArticles.map((art) => (
-                  <li key={art.slug}>
-                    {/* SEO ФИКС: Променено от ?post=slug към чист SEO URL */}
-                    <a href={`/blog/${art.slug}`} className="text-teal-700 underline font-medium">
-                      {art.title}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </noscript>
-
-          {/* Динамично зареждане на Soro скрипта */}
-          <Script 
-            src="https://app.trysoro.com/api/embed/9956916d-04d4-476a-afc4-0ab6bb82b06d"
-            strategy="afterInteractive"
-          />
         </div>
 
         {/* ДЯСНА КОЛОНА (SIDEBAR) */}
@@ -211,7 +204,6 @@ export default async function BlogPage() {
                 houses.map((house) => (
                   <Link 
                     key={house.id} 
-                    // Проверка за SEO slug при къщите, ако е наличен
                     href={`/houses/${house.slug || house.id}`} 
                     className="group block overflow-hidden"
                   >
@@ -234,7 +226,6 @@ export default async function BlogPage() {
               )}
             </div>
             
-            {/* Бутон към цялата страница с къщи */}
             <Link 
               href="/houses" 
               className="block text-center mt-6 py-3 border border-slate-200 text-xs font-black uppercase tracking-widest hover:bg-slate-900 hover:text-white transition-all rounded"
